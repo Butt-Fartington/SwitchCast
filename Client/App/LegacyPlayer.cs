@@ -94,6 +94,10 @@ namespace SysDVR.Client.App
                             {
                                 Console.WriteLine(player.GetDebugString());
                             }
+                            else if (evt.key.keysym.scancode == SDL.SDL_Scancode.SDL_SCANCODE_T)
+                            {
+                                player.RotateClockwise();
+                            }
                         }
                     }
 

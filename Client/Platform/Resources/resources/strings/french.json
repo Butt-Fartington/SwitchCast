@@ -11,7 +11,7 @@
   "legacyPlayer": {
     "starting": "Démarrage en mode hérité...",
     "audioOnly": "Aucune sortie vidéo demandé, appuyer sur Retour pour quitter",
-    "started": "Lancement du stream, raccourcis claviers:\n\t- F11: activer le plein écran\n\t- echap: quitter\n\t- suppr arrière: Afficher les infos de débogage",
+    "started": "Lancement du stream, raccourcis claviers:\n\t- F11: activer le plein écran\n\t- T: faire pivoter la vidéo\n\t- echap: quitter\n\t- suppr arrière: Afficher les infos de débogage",
     "multipleDevicesLine1": "Plusieurs appareils trouvés:",
     "multipleDevicesLine2": "Le premier va être utilisé, vous pouvez en sélectionner un en particulier avec l'option --serial de la ligne de commande",
     "deviceNotFoundRetry": "Appareil non trouvé, nouvel essai dans 5 secondes...",
@@ -125,7 +125,7 @@
   "player": {
     "confirmQuitPopupTitle": "Confirmer la sortie",
     "confirmQuitLabel": "Etes-vous sûr de vouloir quitter?",
-    "shortcuts": "Raccourcis clavier :\n - S : Capture d'écran\n - R : Démarrer/arrêter l'enregistrement\n - F : Activer le plein écran\n - Haut/Bas : Changer le volume audio\n - Echap : Quitter",
+    "shortcuts": "Raccourcis clavier :\n - S : Capture d'écran\n - R : Démarrer/arrêter l'enregistrement\n - T : Faire pivoter la vidéo\n - F : Activer le plein écran\n - Haut/Bas : Changer le volume audio\n - Echap : Quitter",
     "audioOnlyMode": "Le stream est en mode audio seul.",
     "takeScreenshot": "Capture d'écran",
     "startRecording": "Début enregistrement",
@@ -135,6 +135,7 @@
     "stopStreaming": "Stream stoppé",
     "debugInfo": "Info de débogage",
     "enterFullScreen": "Plein écran",
+    "rotate": "Pivoter",
     "hideOverlayLabel": "Appuyer n'importe où pour masquer l'interface",
     "screenshotSavedToClip": "Capture d'écran enregistrée dans le presse-papier",
     "screenshotSaved": "Capture d'écran enregistrée dans {0}",

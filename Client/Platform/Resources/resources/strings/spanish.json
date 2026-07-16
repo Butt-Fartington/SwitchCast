@@ -8,7 +8,7 @@
   "legacyPlayer": {
     "starting": "Iniciando en modo heredado..",
     "audioOnly": "No se ha solicitado streaming de video, solo de audio. Pulse return para volver.",
-    "started": "Iniciando retransmisión, lista de atajos de teclado:\n\t- F11: Activar pantalla completa\n\t- esc: Salir\n\t- return: Imprimir información de depuración",
+    "started": "Iniciando retransmisión, lista de atajos de teclado:\n\t- F11: Activar pantalla completa\n\t- T: Rotar vídeo\n\t- esc: Salir\n\t- return: Imprimir información de depuración",
     "multipleDevicesLine1": "Varios dispositivos encontrados:",
     "multipleDevicesLine2": "El primer dispositivo será usado, puedes seleccionar uno en específico usando el comando en --serial en la línea de comandos.",
     "deviceNotFoundRetry": "Dispositivo no encontrado, intentando de nuevo en 5 segundos.",
@@ -119,7 +119,7 @@
   "player": {
     "confirmQuitPopupTitle": "Confirmar salida",
     "confirmQuitLabel": "¿Está seguro de que desea salir de la aplicación?",
-    "shortcuts": "Atajos de teclado:\n - S : Captura de pantalla\n - R : Iniciar/Parar grabación\n - F : Alternar pantalla completa\n - Arriba/Abajo : Cambiar volumen\n - Esc : Salir",
+    "shortcuts": "Atajos de teclado:\n - S : Captura de pantalla\n - R : Iniciar/Parar grabación\n - T : Rotar vídeo\n - F : Alternar pantalla completa\n - Arriba/Abajo : Cambiar volumen\n - Esc : Salir",
     "audioOnlyMode": "La retransmisión está en modo de audio solamente",
     "takeScreenshot": "Captura de pantalla",
     "startRecording": "Iniciar grabación",
@@ -129,6 +129,7 @@
     "stopStreaming": "Parar retransmisión",
     "debugInfo": "Información de depuración",
     "enterFullScreen": "Pantalla completa",
+    "rotate": "Rotar",
     "hideOverlayLabel": "Pulse en cualquier lugar de la pantalla para ocultar el Overlay",
     "screenshotSavedToClip": "Captura de pantalla guardada en el portapapeles",
     "screenshotSaved": "Captura de pantalla guardada en {0}",

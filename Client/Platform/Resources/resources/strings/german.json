@@ -7,7 +7,7 @@
   "legacyPlayer": {
     "starting": "Lade mit Abwärtskompatiblität...",
     "audioOnly": "Keine Videoausgabe ausgewählt, drücke Enter zum Beenden",
-    "started": "Beginn des Streamings, Liste der Tastenkombinationen:\n\t- F11: Vollbild umschalten\n\t- esc: beenden\n\t- return: Debug-Informationen drucken",
+    "started": "Beginn des Streamings, Liste der Tastenkombinationen:\n\t- F11: Vollbild umschalten\n\t- T: Video drehen\n\t- esc: beenden\n\t- return: Debug-Informationen drucken",
     "multipleDevicesLine1": "Mehrere Geräte gefunden:",
     "multipleDevicesLine2": "Die erste wird verwendet, Sie können eine bestimmte auswählen, indem Sie die Option --serial in der Befehlszeile verwenden",
     "deviceNotFoundRetry": "Gerät nicht gefunden, versuche in 5 Sekunden nochmals...",
@@ -114,7 +114,7 @@
   "player": {
     "confirmQuitPopupTitle": "Beenden bestätigen",
     "confirmQuitLabel": "Sind Sie sicher, dass Sie das Programm beenden wollen?",
-    "shortcuts": "Tastenkürzel:\n - S : Bildschirmfoto aufnehmen\n - R : Aufnahme starten/stoppen\n - F : Vollbildmodus an/aus\n - Hoch/Runter : Lautstärke ändern\n - Esc : Schließen",
+    "shortcuts": "Tastenkürzel:\n - S : Bildschirmfoto aufnehmen\n - R : Aufnahme starten/stoppen\n - T : Video drehen\n - F : Vollbildmodus an/aus\n - Hoch/Runter : Lautstärke ändern\n - Esc : Schließen",
     "audioOnlyMode": "Das Streaming ist auf den reinen Audiomodus eingestellt.",
     "takeScreenshot": "Screenshot",
     "startRecording": "Aufnahme starten",
@@ -124,6 +124,7 @@
     "stopStreaming": "Streaming beenden",
     "debugInfo": "Debug info",
     "enterFullScreen": "Vollbild",
+    "rotate": "Drehen",
     "hideOverlayLabel": "Auf beliebige Stelle tippen, um das Overlay auszublenden.",
     "screenshotSavedToClip": "Screenshot in der Zwischenablage gespeichert",
     "screenshotSaved": "Screenshot gespeichert in {0}",

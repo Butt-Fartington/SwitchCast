@@ -7,7 +7,7 @@
   "legacyPlayer": {
     "starting": "Avvio in modalità legacy...",
     "audioOnly": "La condivisione è in modalita solo audio, premi invio per uscire.",
-    "started": "Avvio dello stream, Comandi da tastiera:\n\t- F11: attiva/disattiva schermo intero\n\t- esc: esci\n\t- return: Stampa informazioni di diagnostica",
+    "started": "Avvio dello stream, Comandi da tastiera:\n\t- F11: attiva/disattiva schermo intero\n\t- T: ruota video\n\t- esc: esci\n\t- return: Stampa informazioni di diagnostica",
     "multipleDevicesLine1": "Più di un dispositivo trovato:",
     "multipleDevicesLine2": "Verrà utilizzato il primo, puoi specificare un numero di serie con l'opzione da linea di comando --serial",
     "deviceNotFoundRetry": "Nessun dispositivo trovato, nuovo tentativo in 5 secondi...",
@@ -120,7 +120,7 @@
   "player": {
     "confirmQuitPopupTitle": "Conferma",
     "confirmQuitLabel": "Sei sicuro di voler uscire ?",
-    "shortcuts": "Scorciatoie da tastiera:\n - S : screenshot\n - R : avvia o ferma la registrazione\n - F : schermo intero\n - Freccia Su/Giu : regola volume\n - Esc : esci",
+    "shortcuts": "Scorciatoie da tastiera:\n - S : screenshot\n - R : avvia o ferma la registrazione\n - T : ruota video\n - F : schermo intero\n - Freccia Su/Giu : regola volume\n - Esc : esci",
     "audioOnlyMode": "Lo stream è in modalità solo audio.",
     "takeScreenshot": "Screenshot",
     "startRecording": "Registra",
@@ -130,6 +130,7 @@
     "stopStreaming": "Ferma stream",
     "debugInfo": "Diagnostica",
     "enterFullScreen": "Schermo intero",
+    "rotate": "Ruota",
     "hideOverlayLabel": "Premi in uno spazio vuoto per nascondere l'overlay",
     "screenshotSavedToClip": "Screenshot salvato nella clipboard",
     "screenshotSaved": "Screenshot salvato in {0}",

@@ -9,7 +9,7 @@
   "legacyPlayer": {
     "starting": "在正常模式下启动...",
     "audioOnly": "未请求视频输出，按回车键退出",
-    "started": "开始流式传输，键盘快捷键列表:\n\t- F11：切换全屏\n\t- ESC：退出\n\t- return： 打印调试信息",
+    "started": "开始流式传输，键盘快捷键列表:\n\t- F11：切换全屏\n\t- T：旋转画面\n\t- ESC：退出\n\t- return： 打印调试信息",
     "multipleDevicesLine1": "找到多个设备:",
     "multipleDevicesLine2": "将使用第一个，您可以通过在命令行中使用 --serial 选项来选择特定的一个",
     "deviceNotFoundRetry": "未找到设备，请在 5 秒后重试...",
@@ -117,7 +117,7 @@
   "player": {
     "confirmQuitPopupTitle": "Confirm quit",
     "confirmQuitLabel": "Are you sure you want to quit?",
-    "shortcuts": "播放器快捷键：\n - S ：捕获截屏\n - R ：开始/停止录制\n - F ：切换全屏\n - 上/下 ：改变音量\n - Esc ：退出",
+    "shortcuts": "播放器快捷键：\n - S ：捕获截屏\n - R ：开始/停止录制\n - T ：旋转画面\n - F ：切换全屏\n - 上/下 ：改变音量\n - Esc ：退出",
     "audioOnlyMode": "流式传输设置为纯音频模式.",
     "takeScreenshot": "截屏",
     "startRecording": "开始录制",
@@ -127,6 +127,7 @@
     "stopStreaming": "停止流式传输",
     "debugInfo": "调试信息",
     "enterFullScreen": "全屏幕",
+    "rotate": "旋转",
     "hideOverlayLabel": "点击任意位置以隐藏叠加层",
     "screenshotSavedToClip": "屏幕截图保存到剪贴板",
     "screenshotSaved": "屏幕截图保存到 {0}",

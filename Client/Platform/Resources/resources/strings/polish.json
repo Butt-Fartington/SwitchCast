@@ -8,7 +8,7 @@
   "legacyPlayer": {
     "starting": "Uruchaminie w trybie wsparcia dla starszych konfiguracji...",
     "audioOnly": "Nie wybrano wyjścia sygnału wideo, naciśnij 'Wróć', aby wyjść",
-    "started": "Uruchamianie strumienia, lista skrótów klawiszowych:\n\t- F11: Przełącznik trybu pełnego ekranu\n\t- Esc: wyjście\n\t- Return: wyświetlenie informacji debugowania",
+    "started": "Uruchamianie strumienia, lista skrótów klawiszowych:\n\t- F11: Przełącznik trybu pełnego ekranu\n\t- T: obrót wideo\n\t- Esc: wyjście\n\t- Return: wyświetlenie informacji debugowania",
     "multipleDevicesLine1": "Znaleziono kilka urządzeń:",
     "multipleDevicesLine2": "Zostanie użyte pierwsze z nich, możesz wybrać inne używając opcji --serial w linii komend",
     "deviceNotFoundRetry": "Nie odnaleziono urządzenia, ponowienie próby za 5 sekund...",
@@ -112,7 +112,7 @@
   "player": {
     "confirmQuitPopupTitle": "Potwierdź wyjście",
     "confirmQuitLabel": "Czy jesteś pewny, że chcesz wyjść?",
-    "shortcuts": "Skróty odtwarzacza:\n - S : przechwytywanie zrzutu ekranu\n - R : rozpoczęcie/zatrzymanie nagrywania\n - F : przełącznik trybu pełnego ekranu\n - Esc : wyjście",
+    "shortcuts": "Skróty odtwarzacza:\n - S : przechwytywanie zrzutu ekranu\n - R : rozpoczęcie/zatrzymanie nagrywania\n - T : obrót wideo\n - F : przełącznik trybu pełnego ekranu\n - Esc : wyjście",
     "audioOnlyMode": "Strumieniowanie jest ustawione wyłącznie na tryb audio.",
     "takeScreenshot": "Zrzut ekranu",
     "startRecording": "Rozpocznij nagrywanie",
@@ -122,6 +122,7 @@
     "stopStreaming": "Zatrzymaj strumień",
     "debugInfo": "Informacje debugowania",
     "enterFullScreen": "Pełny ekran",
+    "rotate": "Obróć",
     "hideOverlayLabel": "Naciśnij w dowolnym miejscu, aby ukryć nakładkę",
     "screenshotSavedToClip": "Zrzut ekranu skopiowany do schowka",
     "screenshotSaved": "Zrzut ekranu zapisany do {0}",

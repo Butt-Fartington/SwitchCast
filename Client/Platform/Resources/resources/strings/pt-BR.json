@@ -11,7 +11,7 @@
   "legacyPlayer": {
     "starting": "Iniciando em modo legado...",
     "audioOnly": "Saída de vídeo não requisitada, aperte enter para sair",
-    "started": "Começando a transmitir. Lista de atalhos do teclado:\n\t- F11: habilitar tela cheia\n\t- esc: sair\n\t- enter: mostrar informações de debug",
+    "started": "Começando a transmitir. Lista de atalhos do teclado:\n\t- F11: habilitar tela cheia\n\t- T: rotacionar vídeo\n\t- esc: sair\n\t- enter: mostrar informações de debug",
     "multipleDevicesLine1": "Vários dispositivos encontrados:",
     "multipleDevicesLine2": "O primeiro será usado. Você pode selecionar algum em específico usando a opção --serial na linha de comando",
     "deviceNotFoundRetry": "Dispositivo não encontrado, tentando novamente em 5 segundos...",
@@ -125,7 +125,7 @@
   "player": {
     "confirmQuitPopupTitle": "Confirmar saída",
     "confirmQuitLabel": "Você tem certeza que quer sair?",
-    "shortcuts": "Atalhos do teclado:\n - S : capturar tela\n - R : começar/parar gravação\n - F : habilitar tela cheia\n - Up/Down : mudar volume de áudio\n - Esc : sair",
+    "shortcuts": "Atalhos do teclado:\n - S : capturar tela\n - R : começar/parar gravação\n - T : rotacionar vídeo\n - F : habilitar tela cheia\n - Up/Down : mudar volume de áudio\n - Esc : sair",
     "audioOnlyMode": "A transmissão está definida para somente áudio.",
     "takeScreenshot": "Capturar tela",
     "startRecording": "Começar gravação",
@@ -135,6 +135,7 @@
     "stopStreaming": "Parar a transmissão",
     "debugInfo": "Informação de debug",
     "enterFullScreen": "Tela cheia",
+    "rotate": "Rotacionar",
     "hideOverlayLabel": "Toque em qualquer lugar para esconder o overlay",
     "screenshotSavedToClip": "Captura de tela salva na área de transferência",
     "screenshotSaved": "Captura de tela salva em {0}",

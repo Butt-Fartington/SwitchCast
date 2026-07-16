@@ -11,7 +11,7 @@
    "legacyPlayer": {
      "starting": "在正常模式下啟動...",
      "audioOnly": "未要求視訊輸出，按回車鍵退出",
-     "started": "開始串流傳輸，鍵盤快速鍵清單:\n\t- F11：切換全螢幕\n\t- ESC：退出\n\t- return： 列印偵錯訊息",
+     "started": "開始串流傳輸，鍵盤快速鍵清單:\n\t- F11：切換全螢幕\n\t- T：旋轉畫面\n\t- ESC：退出\n\t- return： 列印偵錯訊息",
      "multipleDevicesLine1": "找到多個裝置:",
      "multipleDevicesLine2": "將使用第一個，您可以透過在命令列中使用 --serial 選項來選擇特定的一個",
      "deviceNotFoundRetry": "未找到設備，請在 5 秒後重試...",
@@ -119,7 +119,7 @@
   "player": {
     "confirmQuitPopupTitle": "確定退出",
     "confirmQuitLabel": "你確定想要退出吗?",
-    "shortcuts": "播放器快捷鍵：\n - S ：捕獲截屏\n - R ：開始/停止錄制\n - F ：切換全屏\n - 上/下 ：改變音量\n - Esc退出",
+    "shortcuts": "播放器快捷鍵：\n - S ：捕獲截屏\n - R ：開始/停止錄制\n - T ：旋轉畫面\n - F ：切換全屏\n - 上/下 ：改變音量\n - Esc ：退出",
     "audioOnlyMode": "串流設定為純音訊模式.",
     "takeScreenshot": "截圖",
     "startRecording": "開始錄製",
@@ -129,6 +129,7 @@
     "stopStreaming": "停止串流",
     "debugInfo": "偵錯資訊",
     "enterFullScreen": "全螢幕",
+    "rotate": "旋轉",
     "hideOverlayLabel": "點擊任意位置以隱藏疊層",
     "screenshotSavedToClip": "螢幕截圖儲存到剪貼簿",
     "screenshotSaved": "螢幕截圖儲存到 {0}",

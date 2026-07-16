@@ -12,7 +12,7 @@
   "legacyPlayer": {
     "starting": "Starting in legacy mode...",
     "audioOnly": "No video output requested, press return to quit",
-    "started": "Starting to stream, keyboard shortcuts list:\n\t- F11: toggle full screen\n\t- esc: quit\n\t- return: Print debug information",
+    "started": "Starting to stream, keyboard shortcuts list:\n\t- F11: toggle full screen\n\t- T: rotate video\n\t- esc: quit\n\t- return: Print debug information",
     "multipleDevicesLine1": "Multiple devices found:",
     "multipleDevicesLine2": "The first one will be used, you can select a specific one by using the --serial option in the command line",
     "deviceNotFoundRetry": "Device not found, trying again in 5 seconds...",
@@ -128,7 +128,7 @@
   "player": {
     "confirmQuitPopupTitle": "Confirm quit",
     "confirmQuitLabel": "Are you sure you want to quit?",
-    "shortcuts": "Keyboard shortcuts:\n - S : capture screenshot\n - R : start/stop recording\n - F : toggle full screen\n - Up/Down : change audio volume\n - Esc : quit",
+    "shortcuts": "Keyboard shortcuts:\n - S : capture screenshot\n - R : start/stop recording\n - T : rotate video\n - F : toggle full screen\n - Up/Down : change audio volume\n - Esc : quit",
     "audioOnlyMode": "Streaming is set to audio-only mode.",
     "takeScreenshot": "Screenshot",
     "startRecording": "Start recording",
@@ -138,6 +138,7 @@
     "stopStreaming": "Stop streaming",
     "debugInfo": "Debug info",
     "enterFullScreen": "Full screen",
+    "rotate": "Rotate",
     "hideOverlayLabel": "Tap anywhere to hide the overlay",
     "screenshotSavedToClip": "Screenshot saved to clipboard",
     "screenshotSaved": "Screenshot saved to {0}",

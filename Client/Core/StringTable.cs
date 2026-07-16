@@ -54,6 +54,7 @@ namespace SysDVR.Client.Core
 			public string Started =
 				"Starting to stream, keyboard shortcuts list:\n" +
 				"\t- F11: toggle full screen\n" +
+				"\t- T: rotate video\n" +
 				"\t- esc: quit\n" +
 				"\t- return: Print debug information";
 
@@ -244,6 +245,7 @@ namespace SysDVR.Client.Core
 					"Keyboard shortcuts:\n" +
 					" - S : capture screenshot\n" +
 					" - R : start/stop recording\n" +
+					" - T : rotate video\n" +
 					" - F : toggle full screen\n" +
 					" - Up/Down : change audio volume\n" +
 					" - Esc : quit";
@@ -261,6 +263,7 @@ namespace SysDVR.Client.Core
 			public string StopStreaming = "Stop streaming";
 			public string DebugInfo = "Debug info";
 			public string EnterFullScreen = "Full screen";
+			public string Rotate = "Rotate";
 			public string HideOverlayLabel = "Tap anywhere to hide the overlay";
 
 			public string ScreenshotSavedToClip = "Screenshot saved to clipboard";
