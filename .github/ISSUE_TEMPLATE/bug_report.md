@@ -1,29 +1,38 @@
 ---
 name: Bug report
-about: Report a bug you encountered while using SysDVR
+about: Report a reproducible SwitchCast problem
 title: "[Bug] "
-labels: ''
-assignees: ''
-
+labels: bug
+assignees: ""
 ---
 
-[To submit a bug report fill all the parts of the template, then remove all the text within square brackets "[ ]" ]
-[Issues that don't follow the template will be closed]
+Before opening an issue, confirm the problem occurs with an unmodified
+SwitchCast release and that SysDVR or another capture sysmodule is not running
+at the same time.
 
-**Describe the bug**
-[A clear and concise description of what the bug is.]
+## What happened?
 
-**To Reproduce**
-[Explain how to trigger the bug]
+Describe the behavior, what you expected, and the shortest sequence that
+reproduces it.
 
-**Expected behavior**
-[A clear and concise description of what you expected to happen.]
+## Environment
 
-**Setup information**
- - PC Os: [e.g. Windows 10 x64]
- - Console firmware [e.g. 10.0.0]
- - Custom firmware name and version [e.g. Atmosphere 0.12.0]
- - SysDVR version [e.g. 3.0 Usb-Only]
+- SwitchCast version:
+- Console firmware:
+- Atmosphère version:
+- Receiver/TV model:
+- Network layout (router/AP, 2.4 or 5 GHz, guest/VLAN if relevant):
+- Latency profile (`ultra` or `stable`):
+- Game or homebrew title:
+- dvr-patches installed: yes/no
 
-**Additional context**
-[Add any other context about the problem here.]
+## Diagnostics
+
+Attach `/config/switchcast/debug.json` and
+`/config/switchcast/error.json` when present. Remove anything you consider
+private before posting.
+
+## Additional context
+
+Include photos, receiver behavior, approximate run time before failure, and
+whether returning to HOME or changing titles was involved.

@@ -1,85 +1,38 @@
-﻿#include <stdlib.h>
-#include <stdio.h>
-#include <switch.h>
+#include <stdlib.h>
 #include <string.h>
-
-// This is the sysmodule entrypoint, the actual main code is in core.c
-// SysDVR can also be compiled as a regular homebrew for testing purposes, this is what the code refers to as FAKEDVR. When this is done the sysmodule folder must be excluded from compilation.
-// The nro build scaffolding is not part of the sysmodule source.
+#include <switch.h>
 
 #include "../core.h"
-#include "../modes/modes.h"
-#include "../capture.h"
+#include "../ipc/ipc.h"
+#include "../net/sockets.h"
 
-// As of SysDVR 6.0 the sysmodule can run with no dynamic allocations at all
-// All big buffers are statically allocated in the compile units where they're needed
-// For buffers that are mutually exclusive like ones used by the different streaming modes, we use the StaticBuffers union
-// To make this work we override some libnx symbols to ensure the linker won't include malloc and its implementation
-#define USE_HEAP 0
-
-#if !USE_HEAP
+// SwitchCast deliberately runs without a heap. All transport and capture
+// buffers are statically reserved so allocation pressure cannot destabilize
+// other sysmodules while a game is running.
 void* __libnx_aligned_alloc(size_t alignment, size_t size)
 {
+	(void)alignment;
+	(void)size;
 	fatalThrow(ERR_MAIN_ALLOC_DISABLED);
 	return NULL;
 }
 
-void __libnx_free(void* p)
+void __libnx_free(void* pointer)
 {
+	(void)pointer;
 	fatalThrow(ERR_MAIN_ALLOC_DISABLED);
 }
 
 void __libnx_initheap(void)
 {
-	// Newlib
 	extern char* fake_heap_start;
 	extern char* fake_heap_end;
-
 	fake_heap_start = NULL;
 	fake_heap_end = NULL;
 }
-#else
-#define INNER_HEAP_SIZE (1 * 1024 * 1024)
 
-size_t nx_inner_heap_size = INNER_HEAP_SIZE;
-char nx_inner_heap[INNER_HEAP_SIZE];
-
-void __libnx_initheap(void)
-{
-	void* addr = nx_inner_heap;
-	size_t size = nx_inner_heap_size;
-
-	// Newlib
-	extern char* fake_heap_start;
-	extern char* fake_heap_end;
-
-	fake_heap_start = (char*)addr;
-	fake_heap_end = (char*)addr + size;
-}
-#endif
-
-/*
-	Build with USB_ONLY to have a smaller impact on memory,
-	it will only stream via USB and won't support the config app.
-	Note that memory savings don't come from the INNER_HEAP_SIZE variable
-	but from the statically allocated stacks and buffers needed for network modes
-*/
-#ifdef USB_ONLY
-	#pragma message "Building USB-only version"
-#else
-	#pragma message "Building full version"
-	
-	#include "../ipc/ipc.h"
-#endif
-
-#if NEEDS_SOCKETS
-	#include "../net/sockets.h"
-#endif
-
-#if NEEDS_FS
-	static Result fsInitResult;
-	static FsFileSystem sdCard;
-#endif
+static Result FsInitResult;
+static FsFileSystem SdCard;
 
 u32 __nx_applet_type = AppletType_None;
 u32 __nx_fs_num_sessions = 1;
@@ -87,30 +40,29 @@ u32 __nx_fsdev_direntry_cache_size = 1;
 
 void __attribute__((weak)) __appInit(void)
 {
-	svcSleepThread(20E+9); // 20 seconds
+	// Let boot-critical services and other sysmodules settle first.
+	svcSleepThread(20E+9);
 
-	Result rc;
-
-	rc = smInitialize();
+	Result rc = smInitialize();
 	if (R_FAILED(rc))
 		fatalThrow(MAKERESULT(Module_Libnx, LibnxError_InitFail_SM));
 
-#if NEEDS_FS
 	rc = fsInitialize();
 	if (R_FAILED(rc))
 		fatalThrow(MAKERESULT(Module_Libnx, LibnxError_InitFail_FS));
-#endif
 
 	rc = setsysInitialize();
 	if (R_SUCCEEDED(rc)) {
-		SetSysFirmwareVersion fw;
-		rc = setsysGetFirmwareVersion(&fw);
-		if (R_SUCCEEDED(rc))
-			hosversionSet(MAKEHOSVERSION(fw.major, fw.minor, fw.micro));
-
+		SetSysFirmwareVersion firmware;
+		rc = setsysGetFirmwareVersion(&firmware);
+		if (R_SUCCEEDED(rc)) {
+			hosversionSet(MAKEHOSVERSION(
+				firmware.major,
+				firmware.minor,
+				firmware.micro));
+		}
 		setsysExit();
 	}
-
 	if (R_FAILED(rc))
 		fatalThrow(ERR_INIT_FAILED);
 
@@ -118,65 +70,134 @@ void __attribute__((weak)) __appInit(void)
 	if (R_FAILED(rc))
 		fatalThrow(rc);
 
-#if NEEDS_FS	
-	// Ignore erorrs, at most we won't be able to read the default mode
-	// We use this directly because we don't want to depend on fsdev which requires malloc
-	fsInitResult = fsOpenSdCardFileSystem(&sdCard);
-#endif
+	// Failure is nonfatal; SwitchCast can still be enabled from the UI.
+	FsInitResult = fsOpenSdCardFileSystem(&SdCard);
 }
 
 void __attribute__((weak)) __appExit(void)
 {
-#if NEEDS_SOCKETS
+	CoreStop();
 	SocketDeinit();
-#endif
-#if NEEDS_FS
-	if (R_SUCCEEDED(fsInitResult))
-		fsFsClose(&sdCard);
+	if (R_SUCCEEDED(FsInitResult))
+		fsFsClose(&SdCard);
 	fsExit();
-#endif
 	smExit();
 }
 
-#ifndef USB_ONLY
-static bool FileExists(const char* fname)
+static bool FileExists(const char* path)
 {
-	if (R_FAILED(fsInitResult))
+	if (R_FAILED(FsInitResult))
 		return false;
 
 	FsFile file;
-	if (R_SUCCEEDED(fsFsOpenFile(&sdCard, fname, FsOpenMode_Read, &file)))
-	{
-		fsFileClose(&file);
-		return true;
-	}
-	return false;
+	if (R_FAILED(fsFsOpenFile(
+		&SdCard,
+		path,
+		FsOpenMode_Read,
+		&file)))
+		return false;
+	fsFileClose(&file);
+	return true;
 }
-#endif
 
-// from core.c
-void UsbOnlyEntrypoint();
+bool CoreReadSdFile(
+	const char* path,
+	void* output,
+	u64 capacity,
+	u64* outputSize)
+{
+	if (outputSize)
+		*outputSize = 0;
+	if (
+		R_FAILED(FsInitResult) ||
+		!path ||
+		!output ||
+		capacity == 0)
+		return false;
 
-// from TCPMode.c
-extern int g_tcpEnableBroadcast;
+	FsFile file;
+	if (R_FAILED(fsFsOpenFile(
+		&SdCard,
+		path,
+		FsOpenMode_Read,
+		&file)))
+		return false;
+
+	s64 fileSize = 0;
+	Result rc = fsFileGetSize(&file, &fileSize);
+	u64 bytesRead = 0;
+	if (
+		R_SUCCEEDED(rc) &&
+		fileSize >= 0 &&
+		(u64)fileSize <= capacity) {
+		rc = fsFileRead(
+			&file,
+			0,
+			output,
+			(u64)fileSize,
+			FsReadOption_None,
+			&bytesRead);
+	}
+	fsFileClose(&file);
+
+	if (
+		R_FAILED(rc) ||
+		fileSize < 0 ||
+		bytesRead != (u64)fileSize)
+		return false;
+	if (outputSize)
+		*outputSize = bytesRead;
+	return true;
+}
+
+bool CoreWriteSdFile(
+	const char* path,
+	const void* data,
+	u64 size)
+{
+	if (
+		R_FAILED(FsInitResult) ||
+		!path ||
+		(!data && size != 0))
+		return false;
+
+	// Best effort: the file generally does not exist on the first write.
+	fsFsDeleteFile(&SdCard, path);
+	if (R_FAILED(fsFsCreateFile(
+		&SdCard,
+		path,
+		(s64)size,
+		0)))
+		return false;
+
+	FsFile file;
+	if (R_FAILED(fsFsOpenFile(
+		&SdCard,
+		path,
+		FsOpenMode_Write,
+		&file)))
+		return false;
+
+	const Result rc = size == 0
+		? 0
+		: fsFileWrite(
+			&file,
+			0,
+			data,
+			size,
+			FsWriteOption_Flush);
+	fsFileClose(&file);
+	return R_SUCCEEDED(rc);
+}
 
 int main(int argc, char* argv[])
 {
-#ifdef USB_ONLY
-	UsbOnlyEntrypoint();
-#else
-	if (FileExists("/config/sysdvr/no_adv"))
-		g_tcpEnableBroadcast = false;
+	(void)argc;
+	(void)argv;
 
-	if (FileExists("/config/sysdvr/usb"))
-		SetModeID(TYPE_MODE_USB);
-	else if (FileExists("/config/sysdvr/rtsp"))
-		SetModeID(TYPE_MODE_RTSP);
-	else if (FileExists("/config/sysdvr/tcp"))
-		SetModeID(TYPE_MODE_TCP);
+	if (FileExists("/config/switchcast/enabled"))
+		CoreStart();
 
 	IpcThread();
-#endif
-	
 	return 0;
 }

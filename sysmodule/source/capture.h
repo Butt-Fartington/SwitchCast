@@ -107,4 +107,5 @@ void CaptureAudioConnected();
 void CaptureConfigResetDefault();
 int CaptureSetAudioBatching(int batch);
 void CaptureSetPPSSPSInject(bool value);
+int CaptureSetPPSSPSInterval(int interval);
 void CaptureSetNalHashing(bool enabled, bool onlyKeyframes);

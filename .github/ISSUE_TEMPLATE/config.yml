@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Upstream SysDVR
+    url: https://github.com/exelix11/SysDVR
+    about: Use the SysDVR repository for issues that reproduce in unmodified SysDVR.

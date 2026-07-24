@@ -39,8 +39,8 @@ include $(DEVKITPRO)/libnx/switch_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
-SOURCES		:=	source source/sysmodule source/rtsp source/modes source/USB source/ipc source/third_party source/net
-DATA		:=	data
+SOURCES		:=	source source/sysmodule source/cast source/switchcast source/ipc source/third_party source/net
+DATA		:=
 INCLUDES	:=	include
 #ROMFS	:=	romfs
 
@@ -211,6 +211,21 @@ $(OFILES_SRC)	: $(HFILES_BIN)
 # you need a rule like this for each extension you use as binary data
 #---------------------------------------------------------------------------------
 %.bin.o	%_bin.h :	%.bin
+#---------------------------------------------------------------------------------
+	@echo $(notdir $<)
+	@$(bin2o)
+
+%.html.o	%_html.h :	%.html
+#---------------------------------------------------------------------------------
+	@echo $(notdir $<)
+	@$(bin2o)
+
+%.css.o	%_css.h :	%.css
+#---------------------------------------------------------------------------------
+	@echo $(notdir $<)
+	@$(bin2o)
+
+%.js.o	%_js.h :	%.js
 #---------------------------------------------------------------------------------
 	@echo $(notdir $<)
 	@$(bin2o)

@@ -41,6 +41,29 @@ static bool HasNifm;
 
 static u8 alignas(0x1000) TmemBackingBuffer[TMEM_SIZE];
 
+// Match libnx's socket wrapper. Newer bsd service versions are required for
+// correct multicast behavior, which Chromecast discovery depends on.
+static u32 SocketSelectServiceVersion()
+{
+	if (hosversionBefore(3, 0, 0))
+		return 1;
+	if (hosversionBefore(4, 0, 0))
+		return 2;
+	if (hosversionBefore(5, 0, 0))
+		return 3;
+	if (hosversionBefore(6, 0, 0))
+		return 4;
+	if (hosversionBefore(8, 0, 0))
+		return 5;
+	if (hosversionBefore(9, 0, 0))
+		return 6;
+	if (hosversionBefore(13, 0, 0))
+		return 7;
+	if (hosversionBefore(16, 0, 0))
+		return 8;
+	return 9;
+}
+
 #if UDP_LOGGING
 #define TARGET_DEBUG_IP "192.168.178.66"
 
@@ -70,7 +93,7 @@ void SocketInit()
 	memset(TmemBackingBuffer, 0, sizeof(TmemBackingBuffer));
 
 	const BsdInitConfig config = {
-		.version = 1,
+		.version = SocketSelectServiceVersion(),
 		.tmem_buffer = TmemBackingBuffer,
 		.tmem_buffer_size = TMEM_SIZE,
 
@@ -159,7 +182,10 @@ int SocketTcpListen(short port)
 		if (bsdBind(socket, (struct sockaddr*)&addr, sizeof(addr)) == -1)
 			goto failed;
 
-		if (bsdListen(socket, 1) == -1)
+		// Cast Web Receiver pages request HTML, CSS, and JavaScript in quick
+		// succession. Keep a small pending queue so those local asset requests
+		// are not refused while the launch loop services the previous one.
+		if (bsdListen(socket, 4) == -1)
 			goto failed;
 
 		LOG("%d listening on %d\n", socket, (int)port);
@@ -174,6 +200,29 @@ int SocketTcpListen(short port)
 		svcSleepThread(1);
 		continue;
 	}
+}
+
+int SocketTcpConnect(u32 ipv4Address, short port)
+{
+	int socket = bsdSocket(AF_INET, SOCK_STREAM, 0);
+	if (socket == SOCKET_INVALID)
+		return SOCKET_INVALID;
+
+	struct sockaddr_in addr;
+	memset(&addr, 0, sizeof(addr));
+	addr.sin_family = AF_INET;
+	addr.sin_addr.s_addr = ipv4Address;
+	addr.sin_port = htons(port);
+
+	if (bsdConnect(socket, (struct sockaddr*)&addr, sizeof(addr)) == -1)
+	{
+		SocketClose(&socket);
+		return SOCKET_INVALID;
+	}
+
+	const int optVal = 1;
+	bsdSetSockOpt(socket, IPPROTO_TCP, TCP_NODELAY, &optVal, sizeof(optVal));
+	return socket;
 }
 
 // This function must be called after SocketTcpAccept returns SOCKET_INVALID
@@ -238,6 +287,68 @@ bool SocketUDPSendTo(int socket, const void* data, u32 size, struct sockaddr* ad
 	return bsdSendTo(socket, data, size, 0, addr, addrlen) == size;
 }
 
+s32 SocketUDPRecvFrom(int socket, void* data, u32 size, struct sockaddr* addr, socklen_t* addrlen)
+{
+	ssize_t result = bsdRecvFrom(socket, data, size, MSG_DONTWAIT, addr, addrlen);
+	if (result == -1)
+	{
+		if (g_bsdErrno == NX_EAGAIN)
+			return 0;
+		return -1;
+	}
+	return (s32)result;
+}
+
+bool SocketBind(int socket, struct sockaddr* addr, socklen_t addrlen)
+{
+	return bsdBind(socket, addr, addrlen) != -1;
+}
+
+bool SocketSetReuseAddress(int socket, bool allow)
+{
+	const int optVal = allow ? 1 : 0;
+	return bsdSetSockOpt(socket, SOL_SOCKET, SO_REUSEADDR, &optVal, sizeof(optVal)) != -1;
+}
+
+bool SocketJoinMulticast(int socket, u32 multicastAddress)
+{
+	struct ip_mreq request;
+	memset(&request, 0, sizeof(request));
+	request.imr_multiaddr.s_addr = multicastAddress;
+	request.imr_interface.s_addr = INADDR_ANY;
+	return bsdSetSockOpt(
+		socket,
+		IPPROTO_IP,
+		IP_ADD_MEMBERSHIP,
+		&request,
+		sizeof(request)) != -1;
+}
+
+SocketWaitResult SocketWaitReadableEx(int socket, int timeoutMs)
+{
+	struct pollfd pollinfo;
+	pollinfo.fd = socket;
+	pollinfo.events = POLLIN;
+	pollinfo.revents = 0;
+
+	int result = bsdPoll(&pollinfo, 1, timeoutMs);
+	if (result == 0)
+		return SocketWaitResult_Timeout;
+	if (result < 0)
+		return SocketWaitResult_Error;
+	if (pollinfo.revents & (POLLERR | POLLHUP | POLLNVAL))
+		return SocketWaitResult_Closed;
+	if (pollinfo.revents & POLLIN)
+		return SocketWaitResult_Readable;
+	return SocketWaitResult_Error;
+}
+
+bool SocketWaitReadable(int socket, int timeoutMs)
+{
+	return SocketWaitReadableEx(socket, timeoutMs) ==
+		SocketWaitResult_Readable;
+}
+
 typedef enum {
 	PollResult_Timeout,
 	PollResult_Disconnected,
@@ -257,16 +368,17 @@ static PollResult PolLScoket(int socket, int timeoutMs)
 	LOG("%d poll %x\n", socket, pollinfo.revents);
 	if (rc > 0)
 	{
-		// This is not exactly correct, but we only care about the result in the context of SocketSendAll
-		if (pollinfo.revents & POLLERR)
+		if (pollinfo.revents & (POLLERR | POLLHUP | POLLNVAL))
 			return PollResult_Disconnected;
-		else if (pollinfo.revents & POLLHUP)
-			return PollResult_Disconnected;
-		// This comes first to detect disconnection before we can write
-		else if (pollinfo.revents & POLLIN)
-			return PollResult_CanRead;
-		else if (pollinfo.revents & POLLOUT)
+
+		// POLLIN only means that data (or an orderly shutdown) can be read; it
+		// does not mean the connection is dead. In particular, an HTTP client
+		// can leave request bytes readable while POLLOUT also says the rest of
+		// a large segment can be sent. Prefer the writable condition.
+		if (pollinfo.revents & POLLOUT)
 			return PollResult_CanWrite;
+		if (pollinfo.revents & POLLIN)
+			return PollResult_CanRead;
 
 		return PollResult_Other;
 	}

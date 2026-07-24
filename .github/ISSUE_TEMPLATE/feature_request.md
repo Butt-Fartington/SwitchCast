@@ -1,20 +1,21 @@
 ---
 name: Feature request
-about: Suggest an idea for this project
-title: "[Feature request] "
-labels: ''
-assignees: ''
-
+about: Suggest a focused improvement to SwitchCast
+title: "[Feature] "
+labels: enhancement
+assignees: ""
 ---
 
-**Is your feature request related to a problem? Please describe.**
-A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+## Problem
 
-**Describe the solution you'd like**
-A clear and concise description of what you want to happen.
+What limitation or use case should SwitchCast address?
 
-**Describe alternatives you've considered**
-A clear and concise description of any alternative solutions or features you've considered.
+## Proposed behavior
 
-**Additional context**
-Add any other context or screenshots about the feature request here.
+Describe the result you want, including how it should appear in the Settings
+application when relevant.
+
+## Constraints and alternatives
+
+List receiver models, network constraints, memory or latency tradeoffs, and
+any approaches you have already tried.

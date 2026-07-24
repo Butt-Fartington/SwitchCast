@@ -1,3 +1,7 @@
+/*
+ * Derived from the SysDVR capture implementation by Exelix11 and
+ * contributors. SwitchCast remains GPL-2.0; see SYSDVR-ATTRIBUTION.md.
+ */
 #include <string.h>
 
 #include "core.h"
@@ -24,6 +28,8 @@ static const uint8_t SPS[] = { 0x00, 0x00, 0x00, 0x01, 0x67, 0x64, 0x0C, 0x20, 0
 static const uint8_t PPS[] = { 0x00, 0x00, 0x00, 0x01, 0x68, 0xEE, 0x3C, 0xB0 };
 
 static bool forceSPSPPS = false;
+static int SpsPpsIdrInterval = 5;
+static int SpsPpsIdrCount = 0;
 
 static atomic_bool capturing = false;
 
@@ -209,6 +215,7 @@ void CaptureVideoConnected()
 	VPkt.Header.MetaData = PacketMeta_Type_Video;
 	VPkt.Header.ReplaySlot = 0xFF;
 	forceSPSPPS = true;
+	SpsPpsIdrCount = 0;
 }
 
 bool CaptureReadVideo()
@@ -272,15 +279,17 @@ bool CaptureReadVideo()
 			this is not good as without those it's not possible to play the stream If there's space add SPS and PPS to IDR frames every once in a while
 		*/
 		if (InjectSpsPps) {
-			static int IDRCount = 0;
-
-			// if this is an IDR frame and we haven't added SPS/PPS in the last 5 or forceSPSPPS is set
-			bool EmitMeta = forceSPSPPS || (isIDRFrame && ++IDRCount >= 5);
+			// SwitchCast sets the interval to one so every captured IDR carries
+			// the decoder configuration needed for immediate recovery.
+			const bool EmitMeta =
+				isIDRFrame &&
+				(forceSPSPPS ||
+				 ++SpsPpsIdrCount >= SpsPpsIdrInterval);
 
 			// Only if there's enough space
 			if (EmitMeta && (VbufSz - VPkt.Header.DataSize) >= (sizeof(PPS) + sizeof(SPS)))
 			{
-				IDRCount = 0;
+				SpsPpsIdrCount = 0;
 				forceSPSPPS = false;
 				memmove(VPkt.Data + sizeof(PPS) + sizeof(SPS), VPkt.Data, VPkt.Header.DataSize);
 				memcpy(VPkt.Data, SPS, sizeof(SPS));
@@ -314,6 +323,19 @@ void CaptureSetPPSSPSInject(bool value)
 	InjectSpsPps = value;
 }
 
+int CaptureSetPPSSPSInterval(int interval)
+{
+	if (interval < 1)
+		interval = 1;
+	if (interval > 60)
+		interval = 60;
+
+	LOG("CaptureSetPPSSPSInterval(%d)\n", interval);
+	SpsPpsIdrInterval = interval;
+	SpsPpsIdrCount = 0;
+	return SpsPpsIdrInterval;
+}
+
 void CaptureSetNalHashing(bool enabled, bool onlyKeyframes)
 {
 	LOG("CaptureSetNalHashing(%d, %d)\n", enabled, onlyKeyframes);
@@ -325,6 +347,7 @@ void CaptureConfigResetDefault()
 {
 	CaptureSetNalHashing(true, true);
 	CaptureSetPPSSPSInject(true);
+	CaptureSetPPSSPSInterval(5);
 	CaptureSetAudioBatching(DefaultABatching);
 }
 
@@ -332,13 +355,12 @@ Result CaptureInitialize()
 {
 	capturing = true;
 
-	R_RET_ON_FAIL(grcdServiceOpen(&grcdVideo));
-	R_RET_ON_FAIL(grcdServiceOpen(&grcdAudio));
-	return 0;
+	// SwitchCast is video-only. Keeping a second grcd session open for audio
+	// wastes scarce sysmodule resources and is unnecessary for Cast mirroring.
+	return grcdServiceOpen(&grcdVideo);
 }
 
 void CaptureFinalize()
 {
 	grcdServiceClose(&grcdVideo);
-	grcdServiceClose(&grcdAudio);
 }

@@ -1,49 +1,73 @@
-#!/bin/bash
-set -e
+#!/bin/sh
+set -eu
 
-echo building for release
-rm -rf SysmoduleRelease
-mkdir -p SysmoduleRelease/Debug/
+PROJECT_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+VERSION=0.3.0
 
-cd SysDVRConfig
-make clean
-make -j 8
-
-cd ../sysmodule
-make clean
-make -j 8
-
-# Since 6.2.1 we tag the releases with a string to identify them. Ensure that the linker did not strip it accidentally
-if [ -z "$(strings sysmodule.nsp | grep 'SYSDVR_BUILD_FULL')" ]; then
-	echo "Error: SysDVR version string not found in sysmodule.elf"
+if [ -z "${DEVKITPRO:-}" ]; then
+	echo "Set DEVKITPRO to a complete devkitPro installation." >&2
 	exit 1
 fi
 
-mkdir -p ../SysmoduleRelease/Main/atmosphere/contents/00FF0000A53BB665/flags 
-mkdir -p ../SysmoduleRelease/Main/switch 
-mkdir -p ../SysmoduleRelease/Main/config/sysdvr 
-echo . > ../SysmoduleRelease/Main/config/sysdvr/rtsp
-cp sysmodule.nsp ../SysmoduleRelease/Main/atmosphere/contents/00FF0000A53BB665/exefs.nsp
-cp sysmodule.elf ../SysmoduleRelease/Debug/main.elf
-cp toolbox.json ../SysmoduleRelease/Main/atmosphere/contents/00FF0000A53BB665/
-echo . > ../SysmoduleRelease/Main/atmosphere/contents/00FF0000A53BB665/flags/boot2.flag
-cp ../SysDVRConfig/SysDVR-conf.nro ../SysmoduleRelease/Main/switch/SysDVR-conf.nro
-7z a ../SysmoduleRelease/SysDVR.zip ../SysmoduleRelease/Main/*
+make -C "$PROJECT_ROOT/sysmodule" clean
+make -C "$PROJECT_ROOT/sysmodule" -j
+make -C "$PROJECT_ROOT/SwitchCastConfig" clean
+make -C "$PROJECT_ROOT/SwitchCastConfig" -j
 
-make clean
-make -j 8 DEFINES="-DUSB_ONLY" 
+HOST_BUILD="$PROJECT_ROOT/build-host"
+mkdir -p "$HOST_BUILD"
 
-if [ -z "$(strings sysmodule.nsp | grep 'SYSDVR_BUILD_USB_ONLY')" ]; then
-	echo "Error: SysDVR version string not found in sysmodule.elf"
-	exit 1
-fi
+cc -std=c11 -Wall -Wextra -Werror -O2 \
+	"$PROJECT_ROOT/sysmodule/source/cast/cast_streaming.c" \
+	"$PROJECT_ROOT/tests/test_cast_streaming.c" \
+	-o "$HOST_BUILD/test_cast_streaming"
+"$HOST_BUILD/test_cast_streaming"
 
-mkdir -p ../SysmoduleRelease/USB/atmosphere/contents/00FF0000A53BB665/flags 
-cp sysmodule.nsp ../SysmoduleRelease/USB/atmosphere/contents/00FF0000A53BB665/exefs.nsp
-cp sysmodule.elf ../SysmoduleRelease/Debug/usbOnly.elf
-cp toolbox.usb.json ../SysmoduleRelease/USB/atmosphere/contents/00FF0000A53BB665/toolbox.json
-echo . > ../SysmoduleRelease/USB/atmosphere/contents/00FF0000A53BB665/flags/boot2.flag
-7z a ../SysmoduleRelease/USB.zip ../SysmoduleRelease/USB/*
+cc -std=c11 -Wall -Wextra -Werror -O2 \
+	"$PROJECT_ROOT/sysmodule/source/cast/cast_proto.c" \
+	"$PROJECT_ROOT/tests/test_cast_proto.c" \
+	-o "$HOST_BUILD/test_cast_proto"
+"$HOST_BUILD/test_cast_proto"
 
-make clean
-echo done.
+cc -std=c11 -Wall -Wextra -Werror -O2 \
+	"$PROJECT_ROOT/sysmodule/source/cast/fmp4.c" \
+	"$PROJECT_ROOT/tests/test_fmp4.c" \
+	-o "$HOST_BUILD/test_fmp4"
+"$HOST_BUILD/test_fmp4"
+
+c++ -std=c++17 -Wall -Wextra -Werror -O2 \
+	"$PROJECT_ROOT/SwitchCastConfig/source/CastDiscovery.cpp" \
+	"$PROJECT_ROOT/tests/test_cast_discovery.cpp" \
+	-o "$HOST_BUILD/test_cast_discovery"
+"$HOST_BUILD/test_cast_discovery"
+
+RELEASE_ROOT="$PROJECT_ROOT/build-release/SwitchCast"
+rm -rf "$PROJECT_ROOT/build-release"
+mkdir -p \
+	"$RELEASE_ROOT/atmosphere/contents/00FF000053434153/flags" \
+	"$RELEASE_ROOT/config/switchcast" \
+	"$RELEASE_ROOT/switch"
+cp -R "$PROJECT_ROOT/release-template/." "$RELEASE_ROOT/"
+
+cp "$PROJECT_ROOT/sysmodule/sysmodule.nsp" \
+	"$RELEASE_ROOT/atmosphere/contents/00FF000053434153/exefs.nsp"
+cp "$PROJECT_ROOT/sysmodule/toolbox.json" \
+	"$RELEASE_ROOT/atmosphere/contents/00FF000053434153/toolbox.json"
+cp "$PROJECT_ROOT/SwitchCastConfig/SwitchCast.nro" \
+	"$RELEASE_ROOT/switch/SwitchCast.nro"
+cp "$PROJECT_ROOT/README.md" "$RELEASE_ROOT/SWITCHCAST.md"
+cp "$PROJECT_ROOT/SYSDVR-ATTRIBUTION.md" "$RELEASE_ROOT/"
+cp "$PROJECT_ROOT/CASTING.md" "$RELEASE_ROOT/SWITCHCAST-PROTOCOL.md"
+cp "$PROJECT_ROOT/BRANDING.md" "$RELEASE_ROOT/"
+cp "$PROJECT_ROOT/NOTICE.md" "$PROJECT_ROOT/THIRD-PARTY-NOTICES.md" \
+	"$PROJECT_ROOT/LICENSE" "$RELEASE_ROOT/"
+mkdir -p "$RELEASE_ROOT/third_party/licenses"
+cp "$PROJECT_ROOT/third_party/licenses/"* \
+	"$RELEASE_ROOT/third_party/licenses/"
+
+(
+	cd "$RELEASE_ROOT"
+	zip -q -r "../SwitchCast-Standalone-v$VERSION.zip" .
+)
+
+echo "Built $PROJECT_ROOT/build-release/SwitchCast-Standalone-v$VERSION.zip"

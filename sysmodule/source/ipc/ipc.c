@@ -1,316 +1,309 @@
-#if !defined(USB_ONLY)
 #include <string.h>
 
 #include "ipc.h"
-#include "../modes/defines.h"
+#include "../cast/cast.h"
 #include "../core.h"
-#include "../util.h"
+#include "../modes/defines.h"
 
-static Handle handles[2];
-static SmServiceName serverName;
+static Handle Handles[2];
+static SmServiceName ServerName;
 
-static Handle* const serverHandle = &handles[0];
-static Handle* const clientHandle = &handles[1];
+static Handle* const ServerHandle = &Handles[0];
+static Handle* const ClientHandle = &Handles[1];
 
-static void StartServer()
+static void StartServer(void)
 {
-	*serverHandle = INVALID_HANDLE;
-	*clientHandle = INVALID_HANDLE;
-	
-	memcpy(serverName.name, "sysdvr", sizeof("sysdvr"));
-	R_THROW(smRegisterService(serverHandle, serverName, false, 1));
+	*ServerHandle = INVALID_HANDLE;
+	*ClientHandle = INVALID_HANDLE;
+	memcpy(ServerName.name, "swcast", sizeof("swcast"));
+	R_THROW(smRegisterService(
+		ServerHandle,
+		ServerName,
+		false,
+		1));
 }
 
-static void DisconnectClient()
+static void DisconnectClient(void)
 {
-	if (*clientHandle != INVALID_HANDLE)
-	{
-		svcCloseHandle(*clientHandle);
-		*clientHandle = INVALID_HANDLE;
-	}
+	if (*ClientHandle == INVALID_HANDLE)
+		return;
+	svcCloseHandle(*ClientHandle);
+	*ClientHandle = INVALID_HANDLE;
 }
 
-static void StopServer()
+static void StopServer(void)
 {
 	DisconnectClient();
-	svcCloseHandle(*serverHandle);
-	smUnregisterService(serverName);
-	*serverHandle = INVALID_HANDLE;
+	svcCloseHandle(*ServerHandle);
+	smUnregisterService(ServerName);
+	*ServerHandle = INVALID_HANDLE;
 }
 
 typedef struct {
 	u32 type;
-	u64 cmdId;
+	u64 commandId;
 	void* data;
 	u32 dataSize;
 } Request;
 
-static Request ParseRequestFromTLS()
+static Request ParseRequestFromTls(void)
 {
-	Request req = {0};
-
+	Request request = {0};
 	void* base = armGetTls();
 	HipcParsedRequest hipc = hipcParseRequest(base);
+	request.type = hipc.meta.type;
 
-	req.type = hipc.meta.type;
+	if (hipc.meta.type != CmifCommandType_Request)
+		return request;
 
-	if (hipc.meta.type == CmifCommandType_Request)
-	{
-		CmifInHeader* header = (CmifInHeader*)cmifGetAlignedDataStart(hipc.data.data_words, base);
-		size_t dataSize = hipc.meta.num_data_words * 4;
+	CmifInHeader* header = (CmifInHeader*)cmifGetAlignedDataStart(
+		hipc.data.data_words,
+		base);
+	const size_t dataSize = hipc.meta.num_data_words * 4;
+	if (!header)
+		fatalThrow(ERR_IPC_INVHEADER);
+	if (dataSize < sizeof(CmifInHeader))
+		fatalThrow(ERR_IPC_INVSIZE);
+	if (header->magic != CMIF_IN_HEADER_MAGIC)
+		fatalThrow(ERR_IPC_INVMAGIC);
 
-		if (!header)
-			fatalThrow(ERR_IPC_INVHEADER);
-		if (dataSize < sizeof(CmifInHeader))
-			fatalThrow(ERR_IPC_INVSIZE);
-		if (header->magic != CMIF_IN_HEADER_MAGIC)
-			fatalThrow(ERR_IPC_INVMAGIC);
-
-		req.cmdId = header->command_id;
-		req.dataSize = dataSize - sizeof(CmifInHeader);
-		req.data = req.dataSize ? ((u8*)header) + sizeof(CmifInHeader) : NULL;
-	}
-
-	return req;
+	request.commandId = header->command_id;
+	request.dataSize = dataSize - sizeof(CmifInHeader);
+	request.data = request.dataSize
+		? ((u8*)header) + sizeof(CmifInHeader)
+		: NULL;
+	return request;
 }
 
-static void WriteResponseToTLS(Result rc)
+static void WriteResponseToTls(Result rc)
 {
-	HipcMetadata meta = { 0 };
-	meta.type = CmifCommandType_Request;
-	meta.num_data_words = (sizeof(CmifOutHeader) + 0x10) / 4;
+	HipcMetadata metadata = {0};
+	metadata.type = CmifCommandType_Request;
+	metadata.num_data_words =
+		(sizeof(CmifOutHeader) + 0x10) / 4;
 
 	void* base = armGetTls();
-	HipcRequest hipc = hipcMakeRequest(base, meta);
-	CmifOutHeader* rawHeader = (CmifOutHeader*)cmifGetAlignedDataStart(hipc.data_words, base);
-
-	rawHeader->magic = CMIF_OUT_HEADER_MAGIC;
-	rawHeader->result = rc;
-	rawHeader->token = 0;
+	HipcRequest hipc = hipcMakeRequest(base, metadata);
+	CmifOutHeader* header =
+		(CmifOutHeader*)cmifGetAlignedDataStart(
+			hipc.data_words,
+			base);
+	header->magic = CMIF_OUT_HEADER_MAGIC;
+	header->result = rc;
+	header->token = 0;
 }
 
-// Currently not used
-//static bool ReadPayload(const Request* req, void* data, u32 len)
-//{
-//	if (req->dataSize < len || !req->data)
-//		return false;
-//
-//	memcpy(data, req->data, len);
-//	return true;
-//}
-
-static void WritePayloadResponseToTLS(Result rc, const void* payload, u32 len)
+static void WritePayloadResponseToTls(
+	Result rc,
+	const void* payload,
+	u32 length)
 {
-	HipcMetadata meta = { 0 };
-	meta.type = CmifCommandType_Request;
-	meta.num_data_words = (sizeof(CmifOutHeader) + 0x10 + len) / 4;
+	HipcMetadata metadata = {0};
+	metadata.type = CmifCommandType_Request;
+	metadata.num_data_words =
+		(sizeof(CmifOutHeader) + 0x10 + length) / 4;
 
 	void* base = armGetTls();
-	HipcRequest hipc = hipcMakeRequest(base, meta);
-	CmifOutHeader* rawHeader = (CmifOutHeader*)cmifGetAlignedDataStart(hipc.data_words, base);
-
-	rawHeader->magic = CMIF_OUT_HEADER_MAGIC;
-	rawHeader->result = rc;
-	rawHeader->token = 0;
-
-	memcpy(((u8*)rawHeader) + sizeof(CmifOutHeader), payload, len);
+	HipcRequest hipc = hipcMakeRequest(base, metadata);
+	CmifOutHeader* header =
+		(CmifOutHeader*)cmifGetAlignedDataStart(
+			hipc.data_words,
+			base);
+	header->magic = CMIF_OUT_HEADER_MAGIC;
+	header->result = rc;
+	header->token = 0;
+	memcpy(
+		((u8*)header) + sizeof(CmifOutHeader),
+		payload,
+		length);
 }
 
-static u32 modeToSet = TYPE_MODE_INVALID;
-static void ApplyModeChanges()
+typedef enum {
+	Pending_None,
+	Pending_Enable,
+	Pending_Disable
+} PendingAction;
+
+static PendingAction Pending = Pending_None;
+
+static void ApplyPendingAction(void)
 {
-	if (modeToSet == TYPE_MODE_INVALID)
-		return;
-
-	SetModeID(modeToSet);
-
-	modeToSet = TYPE_MODE_INVALID;
+	const PendingAction action = Pending;
+	Pending = Pending_None;
+	if (action == Pending_Enable)
+		CoreStart();
+	else if (action == Pending_Disable)
+		CoreStop();
 }
 
-static bool HandleCommand(const Request* req)
+static bool HandleCommand(const Request* request)
 {
-	switch (req->cmdId)
-	{
-		case CMD_GET_VER:
-		{
-			u32 ver = SYSDVR_IPC_VERSION;
-			WritePayloadResponseToTLS(0, &ver, sizeof(ver));
-			return false;
-		}
-		case CMD_GET_MODE:
-		{
-			u32 mode = GetCurrentMode();
-			WritePayloadResponseToTLS(0, &mode, sizeof(mode));
-			return false;
-		}
-		case CMD_DEBUG_CRASH:
-		{
-			// Crash the process
-			*(u32*)0x0 = 0xDEAD;
-			return false;
-		}
-		case CMD_RESET_DISPLAY:
-		{
-			UtilSetConsoleScreenMode(true);
-			return false;
-		}
-		case CMD_SET_USB:
-		case CMD_SET_TCP:
-		case CMD_SET_RTSP:
-		case CMD_SET_OFF:
-			// This relies nn the following conditions, otherwise it needs custom conversion code
-			_Static_assert(CMD_SET_USB == TYPE_MODE_USB, "");
-			_Static_assert(CMD_SET_TCP == TYPE_MODE_TCP, "");
-			_Static_assert(CMD_SET_RTSP == TYPE_MODE_RTSP, "");
-			_Static_assert(CMD_SET_OFF == TYPE_MODE_NULL, "");
-			modeToSet = req->cmdId;
-			WriteResponseToTLS(0);
-			return false;
-		default:
-			WriteResponseToTLS(ERR_IPC_UNKCMD);
-			return true;
+	switch (request->commandId) {
+	case CMD_GET_VER: {
+		const u32 version = SWITCHCAST_IPC_VERSION;
+		WritePayloadResponseToTls(
+			0,
+			&version,
+			sizeof(version));
+		return false;
+	}
+	case CMD_GET_ENABLED: {
+		const u32 enabled = CoreIsEnabled() ? 1U : 0U;
+		WritePayloadResponseToTls(
+			0,
+			&enabled,
+			sizeof(enabled));
+		return false;
+	}
+	case CMD_GET_CAST_STATUS: {
+		const u32 status = Cast_GetStatus();
+		WritePayloadResponseToTls(
+			0,
+			&status,
+			sizeof(status));
+		return false;
+	}
+	case CMD_GET_CAST_TARGET_DELAY: {
+		const u32 delay = Cast_GetTargetDelayMs();
+		WritePayloadResponseToTls(
+			0,
+			&delay,
+			sizeof(delay));
+		return false;
+	}
+	case CMD_GET_CAST_RECEIVER_DELAY: {
+		const u32 delay = Cast_GetReceiverDelayMs();
+		WritePayloadResponseToTls(
+			0,
+			&delay,
+			sizeof(delay));
+		return false;
+	}
+	case CMD_ENABLE:
+		Pending = Pending_Enable;
+		WriteResponseToTls(0);
+		return false;
+	case CMD_DISABLE:
+		Pending = Pending_Disable;
+		WriteResponseToTls(0);
+		return false;
+	case CMD_DEBUG_CRASH:
+		*(volatile u32*)0 = 0xDEAD;
+		return false;
+	default:
+		WriteResponseToTls(ERR_IPC_UNKCMD);
+		return true;
 	}
 }
 
-static bool IsClientConnected() {
-	return *clientHandle != INVALID_HANDLE;
+static bool IsClientConnected(void)
+{
+	return *ClientHandle != INVALID_HANDLE;
 }
 
-typedef enum { 
-	// Command handled, no error
-	IPC_OK,
-	// Non fatal error
-	IPC_AGAIN,
-	// Request to terminate IPC server
-	IPC_TERMINATE
+typedef enum {
+	Ipc_Ok,
+	Ipc_Again,
+	Ipc_Terminate
 } IpcStatus;
 
-static IpcStatus WaitAndProcessRequest()
+static IpcStatus WaitAndProcessRequest(void)
 {
 	s32 index = -1;
-	Result rc = svcWaitSynchronization(&index, handles, IsClientConnected() ? 2 : 1, UINT64_MAX);
-
-	// Handle common errors
-	if (R_FAILED(rc))
-	{
+	Result rc = svcWaitSynchronization(
+		&index,
+		Handles,
+		IsClientConnected() ? 2 : 1,
+		UINT64_MAX);
+	if (R_FAILED(rc)) {
 		LOG("svcWaitSynchronization: %x\n", rc);
-
-		// Note: we currently don't use cancellation, but it's best to avoid throwing fatal here in case the OS or some other process tries to mess with us
-		if (rc == KERNELRESULT(ThreadTerminating) || rc == KERNELRESULT(Cancelled))
-			return IPC_TERMINATE;
-		else if (rc == KERNELRESULT(InvalidHandle))
-		{
-			// The client might have disconnected unexpectedly
-			if (IsClientConnected()) 
-			{
-				LOG("Unexpected client disconnection %x\n", rc);
+		if (
+			rc == KERNELRESULT(ThreadTerminating) ||
+			rc == KERNELRESULT(Cancelled))
+			return Ipc_Terminate;
+		if (rc == KERNELRESULT(InvalidHandle)) {
+			if (IsClientConnected()) {
 				DisconnectClient();
-				return IPC_AGAIN;
+				Pending = Pending_None;
+				return Ipc_Again;
 			}
-			else
-			{
-				// Our server handle went bad, terminate the server. Let's avoid crashing the console.
-				LOG("The IPC server is terminating due to %x\n", rc);
-				return IPC_TERMINATE;
-			}
+			return Ipc_Terminate;
 		}
-
-		// Other errors are fatal
 		fatalThrow(rc);
 	}
 
-	if (index == 0)
-	{
-		Handle newcli;
-		// Accept session
-		if (R_FAILED(svcAcceptSession(&newcli, *serverHandle)))
-			return IPC_AGAIN;
-		
-		// Max clients reached
-		if (IsClientConnected())
-		{
-			svcCloseHandle(newcli);
-			return IPC_AGAIN;
+	if (index == 0) {
+		Handle newClient;
+		if (R_FAILED(svcAcceptSession(
+			&newClient,
+			*ServerHandle)))
+			return Ipc_Again;
+		if (IsClientConnected()) {
+			svcCloseHandle(newClient);
+			return Ipc_Again;
 		}
-
-		// New client connected, reset any pending state
-		modeToSet = TYPE_MODE_INVALID;
-		*clientHandle = newcli;
-		return IPC_OK;
-	}
-	else if (index == 1)
-	{
-		if (!IsClientConnected()) {
-			// This should never happen
-			LOG("Received message but no client connected!\n");
-			return IPC_AGAIN;
-		}
-
-		// Reeive the request
-		s32 _idx;
-		rc = svcReplyAndReceive(&_idx, clientHandle, 1, 0, UINT64_MAX);
-		if (R_FAILED(rc))
-		{
-			LOG("svcReplyAndReceive (1): %x\n", rc);
-			DisconnectClient();
-			return IPC_AGAIN;
-		}
-
-		// Decode and handle the message
-		bool shouldClose = false;
-		Request r = ParseRequestFromTLS();
-		switch (r.type)
-		{
-		case CmifCommandType_Request:
-			shouldClose = HandleCommand(&r);
-			break;
-		case CmifCommandType_Close:
-			WriteResponseToTLS(0);
-			shouldClose = true;
-			break;
-		default:
-			WriteResponseToTLS(ERR_HIPC_UNKREQ);
-			break;
-		}
-
-		// Finally, send the response.
-		rc = svcReplyAndReceive(&_idx, NULL, 0, *clientHandle, 0);
-		if (R_FAILED(rc) && rc != KERNELRESULT(TimedOut))
-		{
-			LOG("svcReplyAndReceive (2): %x\n", rc);
-			DisconnectClient();
-			return IPC_AGAIN;
-		}
-
-		if (shouldClose) 
-		{
-			DisconnectClient();
-			// If this is a clean disconnection, apply any pending mode changes now
-			ApplyModeChanges();
-		}
-
-		return IPC_OK;
+		Pending = Pending_None;
+		*ClientHandle = newClient;
+		return Ipc_Ok;
 	}
 
-	LOG("Unknown index from svcWaitSynchronization: %d\n", index);
-	return IPC_AGAIN;
+	if (index != 1 || !IsClientConnected())
+		return Ipc_Again;
+
+	s32 receiveIndex;
+	rc = svcReplyAndReceive(
+		&receiveIndex,
+		ClientHandle,
+		1,
+		0,
+		UINT64_MAX);
+	if (R_FAILED(rc)) {
+		DisconnectClient();
+		Pending = Pending_None;
+		return Ipc_Again;
+	}
+
+	bool shouldClose = false;
+	const Request request = ParseRequestFromTls();
+	switch (request.type) {
+	case CmifCommandType_Request:
+		shouldClose = HandleCommand(&request);
+		break;
+	case CmifCommandType_Close:
+		WriteResponseToTls(0);
+		shouldClose = true;
+		break;
+	default:
+		WriteResponseToTls(ERR_HIPC_UNKREQ);
+		break;
+	}
+
+	// Return success before starting or stopping capture. This avoids making
+	// the UI wait for thread teardown and lets it show the new state instantly.
+	rc = svcReplyAndReceive(
+		&receiveIndex,
+		NULL,
+		0,
+		*ClientHandle,
+		0);
+	if (
+		R_FAILED(rc) &&
+		rc != KERNELRESULT(TimedOut)) {
+		DisconnectClient();
+		Pending = Pending_None;
+		return Ipc_Again;
+	}
+
+	ApplyPendingAction();
+	if (shouldClose)
+		DisconnectClient();
+	return Ipc_Ok;
 }
 
-void IpcThread()
+void IpcThread(void)
 {
-	LOG("IPC server starting\n");
 	StartServer();
-	LOG("IPC server started\n");
-
-	while (1)
-	{
-		IpcStatus status = WaitAndProcessRequest();
-		if (status == IPC_TERMINATE)
-			break;
+	while (WaitAndProcessRequest() != Ipc_Terminate) {
 	}
-
-	LOG("IPC server terminating\n");
 	StopServer();
-	LOG("IPC server terminated\n");
 }
-#endif
