@@ -14,6 +14,8 @@ constexpr auto ReceiverPath =
 	SDMC "/config/switchcast/receiver_ip";
 constexpr auto LatencyProfilePath =
 	SDMC "/config/switchcast/latency_profile";
+constexpr auto BlankScreenPath =
+	SDMC "/config/switchcast/blank_screen";
 
 constexpr u32 UltraTargetDelayMs = 90;
 constexpr u32 StableTargetDelayMs = 150;
@@ -22,6 +24,7 @@ Image::Img CastImage;
 bool BootEnabled;
 bool CurrentEnabled;
 bool UltraLatency;
+bool BlankScreen;
 bool RestartAfterProfileChange;
 u32 CurrentStatus = CAST_STATUS_OFF;
 u32 TargetDelayMs = UltraTargetDelayMs;
@@ -159,6 +162,21 @@ bool SaveLatencyProfile(bool ultra)
 	}
 }
 
+bool SaveBlankScreen(bool enabled)
+{
+	try {
+		fs::CreateDir(SDMC "/config/");
+		fs::CreateDir(SDMC "/config/switchcast/");
+		fs::Delete(BlankScreenPath);
+		if (enabled)
+			fs::WriteFile(BlankScreenPath, {'1'});
+		return true;
+	}
+	catch (std::exception&) {
+		return false;
+	}
+}
+
 bool SetEnabled(bool enabled)
 {
 	const Result rc = SwitchCastSetEnabled(enabled);
@@ -186,6 +204,9 @@ void RefreshRuntimeState(void)
 		ReceiverDelayMs = 0;
 	}
 	(void)SwitchCastGetTargetDelay(&TargetDelayMs);
+	u32 blankScreen = 0;
+	if (R_SUCCEEDED(SwitchCastGetBlankScreen(&blankScreen)))
+		BlankScreen = blankScreen != 0;
 }
 
 void PumpProfileRestart(void)
@@ -218,6 +239,29 @@ void SelectLatencyProfile(bool ultra)
 	ReceiverDelayMs = 0;
 	if (CurrentEnabled && SetEnabled(false))
 		RestartAfterProfileChange = true;
+}
+
+void SelectBlankScreen(bool enabled)
+{
+	if (BlankScreen == enabled)
+		return;
+	if (!SaveBlankScreen(enabled)) {
+		app::FatalError(
+			"Couldn't save the screen blanking option.",
+			Strings::Error.TroubleshootBootMode);
+		return;
+	}
+
+	const Result rc = SwitchCastSetBlankScreen(enabled);
+	if (R_FAILED(rc)) {
+		// Keep the persistent preference aligned with the running sysmodule.
+		(void)SaveBlankScreen(!enabled);
+		app::FatalErrorWithErrorCode(
+			"Couldn't change the screen blanking option.",
+			rc);
+		return;
+	}
+	BlankScreen = enabled;
 }
 
 void StatusBadge(
@@ -286,6 +330,12 @@ void DrawDashboard(void)
 		BootEnabled
 			? ImVec4(0.15f, 0.75f, 1.0f, 1.0f)
 			: ImVec4(0.65f, 0.65f, 0.70f, 1.0f));
+	ImGui::SetCursorPos({965, 106});
+	StatusBadge(
+		BlankScreen ? "[ON] BLANK DISPLAY" : "[OFF] SCREEN ON",
+		BlankScreen
+			? ImVec4(1.0f, 0.52f, 0.36f, 1.0f)
+			: ImVec4(0.65f, 0.65f, 0.70f, 1.0f));
 
 	ImGui::EndChild();
 }
@@ -347,6 +397,7 @@ void scenes::RefreshModeSelect(void)
 	ConfiguredReceiver = ReadTrimmedFile(ReceiverPath);
 	UltraLatency =
 		ReadTrimmedFile(LatencyProfilePath) != "stable";
+	BlankScreen = fs::Exists(BlankScreenPath);
 	TargetDelayMs = UltraLatency
 		? UltraTargetDelayMs
 		: StableTargetDelayMs;
@@ -422,7 +473,18 @@ void scenes::ModeSelect(void)
 				? "Ultra-low shortens receiver buffering and packet pacing; use Stable if Wi-Fi recovery suffers."
 				: "Stable retains the proven 0.2.1 receiver buffer and packet pacing.");
 
-	ImGui::SetCursorPos({70, 560});
+	ImGui::SetCursorPos({70, 548});
+	if (ImGui::Button(
+		BlankScreen
+			? "[ON] Blank Switch screen while streaming"
+			: "[OFF] Keep Switch screen on while streaming",
+		{410, 44}))
+		SelectBlankScreen(!BlankScreen);
+	ImGui::SameLine();
+	ImGui::TextUnformatted(
+		"Backlight only; restores when gameplay video stops.");
+
+	ImGui::SetCursorPos({70, 606});
 	if (ImGui::Button(
 		BootEnabled
 			? "Disable automatic start"
@@ -452,9 +514,9 @@ void scenes::ModeSelect(void)
 	if (ImGui::Button("Exit", {125, 44}))
 		app::RequestExit();
 
-	ImGui::SetCursorPosY(632);
+	ImGui::SetCursorPosY(660);
 	CenterText("Built on SysDVR by Exelix11 and contributors");
-	ImGui::SetCursorPosY(665);
+	ImGui::SetCursorPosY(687);
 	CenterText("SysDVR remains the principal capture and sysmodule foundation of SwitchCast");
 
 	DrawTerminatePopup();

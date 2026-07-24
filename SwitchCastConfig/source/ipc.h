@@ -40,7 +40,9 @@ Result SwitchCastGetEnabled(u32* enabled);
 Result SwitchCastGetStatus(u32* status);
 Result SwitchCastGetTargetDelay(u32* delay);
 Result SwitchCastGetReceiverDelay(u32* delay);
+Result SwitchCastGetBlankScreen(u32* enabled);
 Result SwitchCastSetEnabled(bool enabled);
+Result SwitchCastSetBlankScreen(bool enabled);
 
 #ifdef __cplusplus
 }

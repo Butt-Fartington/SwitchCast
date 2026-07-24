@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.1 — 2026-07-24
+
+- Added an optional setting to blank the Switch backlight while gameplay video
+  is actively streaming.
+- Applied screen blanking live without restarting the Cast session.
+- Kept the console display on whenever SwitchCast Settings is open, including
+  when the Settings screen itself is present in the captured video.
+- Restored the backlight when capture becomes inactive, a title exits, the
+  receiver disconnects, or SwitchCast stops.
+- Preserved an already-off backlight instead of unconditionally turning it on.
+
 ## 0.3.0 — 2026-07-24
 
 - Added original SwitchCast branding and a dedicated Cast dashboard.

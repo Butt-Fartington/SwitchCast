@@ -17,6 +17,7 @@
 #include "../modes/modes.h"
 #include "../net/sockets.h"
 #include "../third_party/nanoprintf.h"
+#include "../util.h"
 
 #define CAST_CONTROL_PORT 8009
 #define MDNS_PORT 5353
@@ -74,7 +75,11 @@ static atomic_uint CastStatus = CAST_STATUS_OFF;
 static atomic_bool GameplayReady = false;
 static atomic_ullong LastGameplayTick = 0;
 static atomic_uint CaptureGeneration = 0;
+static atomic_bool BlankScreenEnabled = false;
+static atomic_bool SettingsVisible = false;
 static bool ProcessMonitorInitialized;
+static bool ScreenBlankingApplied;
+static bool ScreenBlankedBySwitchCast;
 
 static int CastSocket = SOCKET_INVALID;
 static int UdpSocket = SOCKET_INVALID;
@@ -163,6 +168,68 @@ uint32_t Cast_GetTargetDelayMs(void)
 uint32_t Cast_GetReceiverDelayMs(void)
 {
 	return atomic_load(&ReceiverPlayoutDelayMs);
+}
+
+bool Cast_GetBlankScreenEnabled(void)
+{
+	return atomic_load(&BlankScreenEnabled);
+}
+
+void Cast_SetBlankScreenEnabled(bool enabled)
+{
+	atomic_store(&BlankScreenEnabled, enabled);
+}
+
+void Cast_SetSettingsVisible(bool visible)
+{
+	atomic_store(&SettingsVisible, visible);
+}
+
+static void UpdateConsoleScreenBlanking(bool videoActive)
+{
+	const bool shouldBlank =
+		videoActive &&
+		atomic_load(&BlankScreenEnabled) &&
+		!atomic_load(&SettingsVisible);
+	if (shouldBlank) {
+		if (ScreenBlankingApplied)
+			return;
+		const UtilScreenModeResult result =
+			UtilSetConsoleScreenMode(false);
+		if (result == UtilScreenMode_Failed)
+			return;
+		ScreenBlankingApplied = true;
+		ScreenBlankedBySwitchCast =
+			result == UtilScreenMode_Changed;
+		return;
+	}
+
+	if (!ScreenBlankingApplied)
+		return;
+	if (!ScreenBlankedBySwitchCast) {
+		// The backlight was already off before SwitchCast touched it.
+		ScreenBlankingApplied = false;
+		return;
+	}
+
+	const UtilScreenModeResult result =
+		UtilSetConsoleScreenMode(true);
+	if (result == UtilScreenMode_Failed)
+		return;
+	ScreenBlankingApplied = false;
+	ScreenBlankedBySwitchCast = false;
+}
+
+static void RestoreConsoleScreen(void)
+{
+	for (
+		unsigned int attempt = 0;
+		attempt < 3 && ScreenBlankingApplied;
+		++attempt) {
+		UpdateConsoleScreenBlanking(false);
+		if (ScreenBlankingApplied)
+			svcSleepThread(20E+6);
+	}
 }
 
 static void SetCastStatus(uint32_t status)
@@ -1255,18 +1322,23 @@ static void SaveDiagnostic(const char* reason)
 static StreamSessionResult RunStreamSession(void)
 {
 	bool sentFirstFrame = false;
+	StreamSessionResult result = StreamSession_Stopped;
 	LastDiagnosticTick = armGetSystemTick();
 	while (Cast_Running) {
-		if (!IsApplicationRunning())
-			return StreamSession_GameplayStopped;
+		if (!IsApplicationRunning()) {
+			result = StreamSession_GameplayStopped;
+			break;
+		}
 
 		if (!PumpCastMessage(NULL, 0, 0) || !PumpRtcp()) {
 			// Cast receivers commonly close their application channel as the
 			// source disappears. If capture stopped at the same time, this is
 			// a normal game transition rather than a permanent media failure.
 			if (!IsApplicationRunning() || !HasRecentGameplay())
-				return StreamSession_GameplayStopped;
-			return StreamSession_Failed;
+				result = StreamSession_GameplayStopped;
+			else
+				result = StreamSession_Failed;
+			break;
 		}
 
 		const int index = AcquireReadySlot();
@@ -1274,7 +1346,8 @@ static StreamSessionResult RunStreamSession(void)
 			if (!SendFrame(index)) {
 				ReleaseSlotToHistory(index);
 				SetCastStatus(CAST_STATUS_PACKET_ERROR);
-				return StreamSession_Failed;
+				result = StreamSession_Failed;
+				break;
 			}
 			ReleaseSlotToHistory(index);
 			if (!sentFirstFrame) {
@@ -1296,14 +1369,22 @@ static StreamSessionResult RunStreamSession(void)
 						UINT64_C(90000) /
 						armGetSystemTickFreq());
 				}
-				if (!SendSenderReport(reportRtpTimestamp))
-					return StreamSession_Failed;
+				if (!SendSenderReport(reportRtpTimestamp)) {
+					result = StreamSession_Failed;
+					break;
+				}
 			}
 			svcSleepThread(
 				IsUltraLowLatency()
 					? STREAM_ULTRA_IDLE_SLEEP_NS
 					: STREAM_STABLE_IDLE_SLEEP_NS);
 		}
+
+		// Only blank after the first gameplay frame is transmitted. If capture stops
+		// producing frames (for example, after HOME or a title transition),
+		// restore the console within the gameplay freshness window.
+		UpdateConsoleScreenBlanking(
+			sentFirstFrame && HasRecentGameplay());
 
 		const u64 now = armGetSystemTick();
 		if (now - LastDiagnosticTick >=
@@ -1312,7 +1393,8 @@ static StreamSessionResult RunStreamSession(void)
 			SaveDiagnostic("streaming");
 		}
 	}
-	return StreamSession_Stopped;
+	RestoreConsoleScreen();
+	return result;
 }
 
 bool Cast_WriteH264(
@@ -1447,6 +1529,7 @@ void Cast_ServerThread(void* unused)
 	(void)unused;
 	mutexInit(&StreamMutex);
 	Cast_Running = true;
+	RestoreConsoleScreen();
 	RefreshLatencyProfile();
 
 	Result rc = pmdmntInitialize();
@@ -1554,6 +1637,7 @@ void Cast_ServerThread(void* unused)
 	}
 
 finished:
+	RestoreConsoleScreen();
 	StopCaptureAndReleaseMemory();
 	StopReceiver();
 	CloseCastConnection();

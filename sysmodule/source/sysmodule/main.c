@@ -3,6 +3,7 @@
 #include <switch.h>
 
 #include "../core.h"
+#include "../cast/cast.h"
 #include "../ipc/ipc.h"
 #include "../net/sockets.h"
 
@@ -195,6 +196,8 @@ int main(int argc, char* argv[])
 	(void)argc;
 	(void)argv;
 
+	Cast_SetBlankScreenEnabled(
+		FileExists("/config/switchcast/blank_screen"));
 	if (FileExists("/config/switchcast/enabled"))
 		CoreStart();
 

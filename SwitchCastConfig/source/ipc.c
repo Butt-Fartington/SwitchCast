@@ -202,11 +202,32 @@ Result SwitchCastGetReceiverDelay(u32* delay)
 	return rc;
 }
 
+Result SwitchCastGetBlankScreen(u32* enabled)
+{
+	u32 value;
+	const Result rc = serviceDispatchOut(
+		&SwitchCastService,
+		CMD_GET_BLANK_SCREEN,
+		value);
+	if (R_SUCCEEDED(rc))
+		*enabled = value;
+	return rc;
+}
+
 Result SwitchCastSetEnabled(bool enabled)
 {
 	return serviceDispatch(
 		&SwitchCastService,
 		enabled ? CMD_ENABLE : CMD_DISABLE);
+}
+
+Result SwitchCastSetBlankScreen(bool enabled)
+{
+	const u32 value = enabled ? 1U : 0U;
+	return serviceDispatchIn(
+		&SwitchCastService,
+		CMD_SET_BLANK_SCREEN,
+		value);
 }
 
 #else
@@ -288,7 +309,19 @@ Result SwitchCastGetReceiverDelay(u32* delay)
 	return 0;
 }
 
+Result SwitchCastGetBlankScreen(u32* enabled)
+{
+	*enabled = 0;
+	return 0;
+}
+
 Result SwitchCastSetEnabled(bool enabled)
+{
+	(void)enabled;
+	return 0;
+}
+
+Result SwitchCastSetBlankScreen(bool enabled)
 {
 	(void)enabled;
 	return 0;

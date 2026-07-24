@@ -15,6 +15,7 @@ static void StartServer(void)
 {
 	*ServerHandle = INVALID_HANDLE;
 	*ClientHandle = INVALID_HANDLE;
+	Cast_SetSettingsVisible(false);
 	memcpy(ServerName.name, "swcast", sizeof("swcast"));
 	R_THROW(smRegisterService(
 		ServerHandle,
@@ -29,6 +30,7 @@ static void DisconnectClient(void)
 		return;
 	svcCloseHandle(*ClientHandle);
 	*ClientHandle = INVALID_HANDLE;
+	Cast_SetSettingsVisible(false);
 }
 
 static void StopServer(void)
@@ -179,6 +181,15 @@ static bool HandleCommand(const Request* request)
 			sizeof(delay));
 		return false;
 	}
+	case CMD_GET_BLANK_SCREEN: {
+		const u32 enabled =
+			Cast_GetBlankScreenEnabled() ? 1U : 0U;
+		WritePayloadResponseToTls(
+			0,
+			&enabled,
+			sizeof(enabled));
+		return false;
+	}
 	case CMD_ENABLE:
 		Pending = Pending_Enable;
 		WriteResponseToTls(0);
@@ -187,6 +198,19 @@ static bool HandleCommand(const Request* request)
 		Pending = Pending_Disable;
 		WriteResponseToTls(0);
 		return false;
+	case CMD_SET_BLANK_SCREEN: {
+		if (
+			!request->data ||
+			request->dataSize < sizeof(u32)) {
+			WriteResponseToTls(ERR_IPC_INVSIZE);
+			return false;
+		}
+		u32 enabled;
+		memcpy(&enabled, request->data, sizeof(enabled));
+		Cast_SetBlankScreenEnabled(enabled != 0);
+		WriteResponseToTls(0);
+		return false;
+	}
 	case CMD_DEBUG_CRASH:
 		*(volatile u32*)0 = 0xDEAD;
 		return false;
@@ -244,6 +268,7 @@ static IpcStatus WaitAndProcessRequest(void)
 		}
 		Pending = Pending_None;
 		*ClientHandle = newClient;
+		Cast_SetSettingsVisible(true);
 		return Ipc_Ok;
 	}
 

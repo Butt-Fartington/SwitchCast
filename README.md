@@ -1,4 +1,4 @@
-# SwitchCast 0.3.0
+# SwitchCast 0.3.1
 
 ![SwitchCast controller-and-video mark](work/assets/switchcast-controller-mark.png)
 
@@ -31,6 +31,17 @@ This repository is maintained as a fork of SysDVR so GitHub also preserves
 the upstream commit history and displays the relationship on every repository
 page. The SwitchCast work is based on SysDVR snapshot
 [`804fd36`](https://github.com/exelix11/SysDVR/commit/804fd36e54983b7c76b249059b159f896af35b4d).
+
+## New in 0.3.1
+
+- An optional **Blank Switch screen while streaming** setting turns off only
+  the console backlight after the first gameplay frame is transmitted.
+- The option applies live and restores the backlight when gameplay frames stop,
+  a title exits, the receiver disconnects, or SwitchCast is stopped.
+- Opening SwitchCast Settings always restores and keeps the console display on,
+  even when the Settings screen itself is being captured.
+- Screen blanking is off by default and never turns on a display that was
+  already off before SwitchCast changed it.
 
 ## New in 0.3.0
 
@@ -81,7 +92,7 @@ because an ordinary homebrew app cannot stay active beside a retail game.
 
 ## Install
 
-1. Extract `SwitchCast-Standalone-v0.3.0.zip` to the SD-card root.
+1. Extract `SwitchCast-Standalone-v0.3.1.zip` to the SD-card root.
 2. Reboot the console.
 3. Open `/switch/SwitchCast.nro` from the Homebrew Menu.
 4. Select **SwitchCast**, then choose a receiver from the discovered list.
@@ -101,17 +112,17 @@ command. Contributions are welcome under the requirements in
 
 ### Upgrading
 
-Version 0.3.0 can be copied directly over 0.2.1. The sysmodule and Settings
-application must both come from the same release because the live latency
-metrics extend the SwitchCast IPC protocol.
+Version 0.3.1 can be copied directly over 0.3.0 or 0.2.1. The sysmodule and
+Settings application must both come from the same release because screen
+blanking and live latency metrics extend the SwitchCast IPC protocol.
 
 ### Upgrading from the 0.1.0 prototype
 
 The prototype occupied the SysDVR content directory
-`/atmosphere/contents/00FF0000A53BB665`. Version 0.3.0 does not overwrite or
+`/atmosphere/contents/00FF0000A53BB665`. Version 0.3.1 does not overwrite or
 remove that directory.
 
-Before testing 0.3.0, make sure the old prototype or SysDVR is not also
+Before testing 0.3.1, make sure the old prototype or SysDVR is not also
 streaming or enabled at boot. Two capture sysmodules can compete for memory and
 the capture service. If `00FF0000A53BB665` contains the old SwitchCast
 prototype, restore your SysDVR backup or remove that old prototype directory.
@@ -131,6 +142,7 @@ prototype, restore your SysDVR backup or remove that old prototype directory.
 /config/switchcast/enabled          start SwitchCast automatically after boot
 /config/switchcast/receiver_ip      selected receiver IPv4 address
 /config/switchcast/latency_profile  `ultra` (90 ms) or `stable` (150 ms)
+/config/switchcast/blank_screen     blank the console backlight during video
 /config/switchcast/debug.json       live transport and recovery statistics
 /config/switchcast/error.json       rejected Cast response, when available
 ```

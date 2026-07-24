@@ -92,6 +92,15 @@ At game exit, capture, UDP, TLS, receiver session, queue state, and the
 temporary heap are released. The sysmodule returns to the armed state for the
 next game.
 
+When screen blanking is enabled, SwitchCast turns off only the console
+backlight after the first gameplay frame is transmitted. It restores the
+backlight when gameplay frames have been absent for three seconds, the title
+exits, the session disconnects, or SwitchCast stops. It records whether it
+actually changed the backlight so cleanup does not turn on a display that was
+already off. While SwitchCast Settings holds its IPC session open, the
+sysmodule restores and keeps the console display on even if the Settings screen
+is part of the captured stream.
+
 Receiver CLOSE or control-channel loss during the same transition is classified
 as normal gameplay shutdown. It no longer parks the sender in a permanent
 failure state. Codec, launch, and transport failures also retry with bounded
