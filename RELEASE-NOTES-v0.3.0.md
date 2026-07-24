@@ -27,3 +27,11 @@ Do not run SysDVR or another capture sysmodule at the same time.
 SwitchCast is built on SysDVR by Exelix11 and contributors. SysDVR is the
 principal technical foundation of this project. The release archive includes
 the GPL-2.0 license, detailed SysDVR lineage, and complete third-party notices.
+
+## Free and open source
+
+SwitchCast is free and open-source software under the GNU General Public
+License version 2. Anyone may use, study, copy, modify, and redistribute it
+without paying a SwitchCast licensing fee, subject to the GPL terms. The
+release archive includes the full license and corresponding source is published
+in this repository.

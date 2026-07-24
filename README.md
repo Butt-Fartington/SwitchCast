@@ -2,6 +2,8 @@
 
 ![SwitchCast controller-and-video mark](work/assets/switchcast-controller-mark.png)
 
+**Free and open-source software — GNU GPL version 2.**
+
 SwitchCast sends the Nintendo Switch's captured H.264 gameplay video directly
 to a Chromecast or Google Cast TV on the local network.
 
@@ -164,11 +166,20 @@ game**, ready for the next title without a reboot.
 
 See `CASTING.md` for the wire protocol and recovery design.
 
-## License and credit
+## Free and open source
 
 SwitchCast is a derivative of SysDVR by Exelix11 and contributors and is
-distributed under GPL-2.0. See `SYSDVR-ATTRIBUTION.md`, `NOTICE.md`,
-`THIRD-PARTY-NOTICES.md`, and `LICENSE`.
+distributed under the GNU General Public License version 2. Anyone may use,
+study, copy, modify, and redistribute it without paying a SwitchCast licensing
+fee. If you distribute SwitchCast or a modified version, you must preserve the
+GPL terms and make the corresponding source available as the license requires.
+The GPL protects software freedom rather than imposing a noncommercial
+restriction, so people may charge for copies or related services while every
+recipient retains the same rights.
+
+See [`LICENSE`](LICENSE), [`SYSDVR-ATTRIBUTION.md`](SYSDVR-ATTRIBUTION.md),
+[`NOTICE.md`](NOTICE.md), and
+[`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md).
 
 The source and binary release both carry the complete attribution bundle.
 Vendored libraries, fonts, statically linked build dependencies, and
