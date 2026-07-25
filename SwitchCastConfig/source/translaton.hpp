@@ -55,7 +55,7 @@ namespace Strings
 		std::string CastStatusReceiverStatusTimeout = "Receiver did not return Cast app status";
 		std::string CastStatusMediaErrorCode = "Receiver media error code";
 		std::string CastStatusAppIdMissing = "Reserved SwitchCast state 29";
-		std::string CastStatusReceiverReadyTimeout = "Reserved SwitchCast state 30";
+		std::string CastStatusReceiverReadyTimeout = "Refreshing the Cast media session after interrupted feedback";
 		std::string CastStatusReceiverStreamError = "Reserved SwitchCast state 31";
 
 		std::string ModeDisabled = "Stop streaming";

@@ -2,7 +2,7 @@
 set -eu
 
 PROJECT_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-VERSION=0.3.1
+VERSION=0.3.2
 
 if [ -z "${DEVKITPRO:-}" ]; then
 	echo "Set DEVKITPRO to a complete devkitPro installation." >&2
@@ -16,6 +16,12 @@ make -C "$PROJECT_ROOT/SwitchCastConfig" -j
 
 HOST_BUILD="$PROJECT_ROOT/build-host"
 mkdir -p "$HOST_BUILD"
+
+cc -std=c11 -Wall -Wextra -Werror -O2 \
+	"$PROJECT_ROOT/sysmodule/source/cast/frame_arena.c" \
+	"$PROJECT_ROOT/tests/test_frame_arena.c" \
+	-o "$HOST_BUILD/test_frame_arena"
+"$HOST_BUILD/test_frame_arena"
 
 cc -std=c11 -Wall -Wextra -Werror -O2 \
 	"$PROJECT_ROOT/sysmodule/source/cast/cast_streaming.c" \

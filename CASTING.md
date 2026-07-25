@@ -77,10 +77,17 @@ It consumes compound receiver packets and handles:
 - all-packets-lost NACKs
 - Picture Loss Indicator (PLI)
 
-Acknowledged history is released immediately. Up to three encoded frames share
-the temporary 2 MiB heap and may be retained for retransmission. If requested
-history is already gone, SwitchCast waits for an IDR so it does not send a
-chain of undecodable predicted frames.
+Acknowledged history is released immediately. Up to 24 descriptors share a
+variable-size 2 MiB arena, allowing many normal encoded frames to remain
+available for retransmission while still admitting large keyframes. This
+replaces the old three-way fixed partition without increasing the heap.
+
+If requested history has already been evicted, a feedback packet exceeds the
+bounded NACK list, or receiver checkpoints stop advancing for three seconds
+while frames remain outstanding, SwitchCast refreshes the Cast media session.
+Capture remains active, the receiver gets new session keys and transport state,
+and transmission resumes at the next IDR instead of leaving a stalled decoder
+chain in place.
 
 ## Game lifecycle and memory
 
@@ -110,9 +117,14 @@ delays while gameplay remains active.
 
 `debug.json` records the selected receiver, negotiated UDP port and SSRCs,
 latency profile, requested and receiver-reported delay, frames
-queued/sent/dropped, RTP/RTCP counts, retransmissions, NACKs, PLI, and
-unrecoverable requests. It is updated at negotiation, stream start, every five
-seconds, and shutdown/failure.
+queued/sent/dropped, RTP/RTCP counts, retransmissions, NACKs, PLI,
+unrecoverable requests, retained-history usage and high-water marks, feedback
+and checkpoint ages, evictions, recovery count, and the recovery reason. It is
+updated at negotiation, stream start, every five seconds, and shutdown/failure.
+
+`last-failure.json` is written before a failed or automatically refreshed media
+session is torn down. Unlike the live diagnostic, it is not cleared when a new
+game starts or overwritten by a successful reconnection.
 
 ## Reference basis
 

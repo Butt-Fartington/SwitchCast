@@ -1,6 +1,6 @@
 # Third-party notices
 
-This file inventories code and data distributed in SwitchCast 0.3.1. It
+This file inventories code and data distributed in SwitchCast 0.3.2. It
 distinguishes material inherited through SysDVR, components vendored in the
 source tree, libraries statically linked by the release toolchain, and
 reference-only projects.
@@ -218,7 +218,7 @@ PERFORMANCE OF THIS SOFTWARE.
 
 ## Statically linked release dependencies
 
-The official 0.3.1 binaries were built with the following devkitPro packages.
+The official 0.3.2 binaries were built with the following devkitPro packages.
 Their source is not vendored in this repository, but portions are linked into
 the executable as shown by the release link map.
 

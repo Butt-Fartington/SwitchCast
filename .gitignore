@@ -33,7 +33,8 @@
 # Retained upstream metadata that does not describe SwitchCast
 /.github/FUNDING.yml
 /.github/images/
-/.github/workflows/
+/.github/workflows/*
+!/.github/workflows/sysmodule.yml
 
 # Local/editor files
 .DS_Store

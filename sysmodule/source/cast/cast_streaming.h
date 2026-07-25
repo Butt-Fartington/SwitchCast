@@ -34,6 +34,7 @@ typedef struct {
 	uint32_t checkpointFrameId;
 	uint16_t playoutDelayMs;
 	size_t nackCount;
+	bool nackOverflow;
 	CastStreamNack nacks[CAST_STREAM_MAX_NACKS];
 } CastStreamFeedback;
 

@@ -172,6 +172,35 @@ static void TestFeedback(void)
 	assert(feedback.nacks[0].packetId == 3);
 	assert(feedback.nacks[1].packetId == 4);
 	assert(feedback.nacks[2].packetId == 6);
+	assert(!feedback.nackOverflow);
+}
+
+static void TestFeedbackOverflow(void)
+{
+	enum { LossCount = CAST_STREAM_MAX_NACKS + 1 };
+	uint8_t packet[20 + LossCount * 4];
+	memset(packet, 0, sizeof(packet));
+	packet[0] = 0x8F;
+	packet[1] = 206;
+	WriteBe16(packet + 2, (uint16_t)(sizeof(packet) / 4 - 1));
+	WriteBe32(packet + 4, UINT32_C(0x11112222));
+	WriteBe32(packet + 8, UINT32_C(0x33334444));
+	WriteBe32(packet + 12, UINT32_C(0x43415354));
+	packet[16] = 0;
+	packet[17] = LossCount;
+	WriteBe16(packet + 18, 90);
+	for (size_t i = 0; i < LossCount; ++i) {
+		packet[20 + i * 4] = (uint8_t)(i + 1);
+		WriteBe16(packet + 21 + i * 4, 0);
+	}
+
+	CastStreamFeedback feedback;
+	assert(CastStreamParseRtcp(
+		packet, sizeof(packet), UINT32_C(0x33334444),
+		UINT32_C(0x11112222), UINT32_C(0x100), &feedback));
+	assert(feedback.valid);
+	assert(feedback.nackCount == CAST_STREAM_MAX_NACKS);
+	assert(feedback.nackOverflow);
 }
 
 int main(void)
@@ -180,6 +209,7 @@ int main(void)
 	TestRtp();
 	TestSenderReportAndNonce();
 	TestFeedback();
+	TestFeedbackOverflow();
 	puts("cast_streaming tests passed");
 	return 0;
 }

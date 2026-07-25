@@ -12,6 +12,7 @@
 
 #include "cast_proto.h"
 #include "cast_streaming.h"
+#include "frame_arena.h"
 #include "fmp4.h"
 #include "../core.h"
 #include "../modes/modes.h"
@@ -24,10 +25,11 @@
 #define CAST_TARGET_PATH "/config/switchcast/receiver_ip"
 #define CAST_LATENCY_PROFILE_PATH "/config/switchcast/latency_profile"
 #define CAST_DIAGNOSTIC_PATH "/config/switchcast/debug.json"
+#define CAST_LAST_FAILURE_PATH "/config/switchcast/last-failure.json"
 #define CAST_ERROR_PATH "/config/switchcast/error.json"
 
 #define STREAM_HEAP_SIZE 0x200000U
-#define STREAM_SLOT_COUNT 3U
+#define STREAM_SLOT_COUNT 24U
 #define STREAM_ULTRA_TARGET_DELAY_MS 90U
 #define STREAM_STABLE_TARGET_DELAY_MS 150U
 #define STREAM_ULTRA_PACING_GROUP 12U
@@ -39,6 +41,7 @@
 #define STREAM_MAX_BIT_RATE 8000000U
 #define STREAM_SENDER_REPORT_INTERVAL_MS 500U
 #define STREAM_DIAGNOSTIC_INTERVAL_SECONDS 5U
+#define STREAM_FEEDBACK_STALL_MS 3000U
 
 #define NS_CONNECTION "urn:x-cast:com.google.cast.tp.connection"
 #define NS_HEARTBEAT "urn:x-cast:com.google.cast.tp.heartbeat"
@@ -54,6 +57,8 @@ typedef enum {
 typedef struct {
 	uint8_t* data;
 	size_t size;
+	size_t offset;
+	size_t allocationSize;
 	uint64_t order;
 	uint64_t captureTick;
 	uint32_t frameId;
@@ -66,6 +71,7 @@ typedef struct {
 typedef enum {
 	StreamSession_Stopped,
 	StreamSession_GameplayStopped,
+	StreamSession_Recover,
 	StreamSession_Failed
 } StreamSessionResult;
 
@@ -99,7 +105,6 @@ static char ActiveSessionId[CAST_PROTO_ID_MAX];
 static Mutex StreamMutex;
 static uint8_t* StreamBuffer;
 static size_t StreamBufferSize;
-static size_t StreamSlotCapacity;
 static StreamSlot StreamSlots[STREAM_SLOT_COUNT];
 static Fmp4Stream H264Config;
 static bool StreamSessionAttached;
@@ -118,9 +123,17 @@ static uint32_t LatestRtpTimestamp;
 static u64 LatestFrameCaptureTick;
 static u64 LastSenderReportTick;
 static u64 LastDiagnosticTick;
+static u64 SessionStartTick;
+static u64 FirstFrameSentTick;
+static u64 LastReceiverFeedbackTick;
+static u64 LastCheckpointAdvanceTick;
 static uint32_t OfferSequenceNumber;
 static bool AnswerReceived;
 static bool AnswerAccepted;
+static bool ReceiverCheckpointSeen;
+static bool StreamRecoveryRequested;
+static uint32_t LatestReceiverCheckpointFrameId;
+static const char* StreamRecoveryReason = "none";
 static CastStreamAnswer SessionAnswer;
 
 static atomic_uint QueuedFrames = 0;
@@ -134,6 +147,11 @@ static atomic_uint RtcpPackets = 0;
 static atomic_uint NackRequests = 0;
 static atomic_uint PictureLossRequests = 0;
 static atomic_uint UnrecoverableNacks = 0;
+static atomic_uint HistoryEvictions = 0;
+static atomic_uint RecoveryRestarts = 0;
+static atomic_uint FeedbackStalls = 0;
+static atomic_uint PeakRetainedFrames = 0;
+static atomic_uint PeakRetainedBytes = 0;
 static atomic_uint ReceiverPlayoutDelayMs = 0;
 static atomic_uint TargetPlayoutDelayMs = STREAM_ULTRA_TARGET_DELAY_MS;
 
@@ -284,19 +302,113 @@ static bool IsApplicationRunning(void)
 		processId != 0;
 }
 
+static void FreeStreamSlotLocked(StreamSlot* slot)
+{
+	slot->data = NULL;
+	slot->size = 0;
+	slot->offset = 0;
+	slot->allocationSize = 0;
+	slot->order = 0;
+	slot->captureTick = 0;
+	slot->frameId = 0;
+	slot->rtpTimestamp = 0;
+	slot->keyFrame = false;
+	slot->encrypted = false;
+	slot->state = StreamSlot_Free;
+}
+
 static void ResetStreamQueueLocked(bool resetCodec)
 {
-	for (size_t i = 0; i < STREAM_SLOT_COUNT; ++i) {
-		StreamSlots[i].size = 0;
-		StreamSlots[i].order = 0;
-		StreamSlots[i].frameId = 0;
-		StreamSlots[i].encrypted = false;
-		StreamSlots[i].state = StreamSlot_Free;
-	}
+	for (size_t i = 0; i < STREAM_SLOT_COUNT; ++i)
+		FreeStreamSlotLocked(&StreamSlots[i]);
 	StreamNextOrder = 1;
 	StreamAwaitingIdr = true;
 	if (resetCodec)
 		Fmp4Init(&H264Config);
+}
+
+static bool FindFreeFrameRegionLocked(
+	size_t frameSize,
+	size_t* offset,
+	size_t* allocationSize)
+{
+	FrameArenaSpan spans[STREAM_SLOT_COUNT];
+	size_t spanCount = 0;
+	for (size_t i = 0; i < STREAM_SLOT_COUNT; ++i) {
+		if (StreamSlots[i].state == StreamSlot_Free)
+			continue;
+		spans[spanCount].offset = StreamSlots[i].offset;
+		spans[spanCount].size = StreamSlots[i].allocationSize;
+		++spanCount;
+	}
+	const size_t alignedSize = FrameArenaAlignedSize(frameSize);
+	if (alignedSize == 0 ||
+		!FrameArenaFindFreeRegion(
+			StreamBufferSize,
+			spans,
+			spanCount,
+			alignedSize,
+			offset))
+		return false;
+	*allocationSize = alignedSize;
+	return true;
+}
+
+static int FindFreeStreamSlotLocked(void)
+{
+	for (size_t i = 0; i < STREAM_SLOT_COUNT; ++i) {
+		if (StreamSlots[i].state == StreamSlot_Free)
+			return (int)i;
+	}
+	return -1;
+}
+
+static bool EvictOldestHistoryLocked(void)
+{
+	int selected = -1;
+	uint64_t oldestOrder = UINT64_MAX;
+	for (size_t i = 0; i < STREAM_SLOT_COUNT; ++i) {
+		if (StreamSlots[i].state == StreamSlot_History &&
+			StreamSlots[i].order < oldestOrder) {
+			selected = (int)i;
+			oldestOrder = StreamSlots[i].order;
+		}
+	}
+	if (selected < 0)
+		return false;
+	FreeStreamSlotLocked(&StreamSlots[selected]);
+	atomic_fetch_add(&HistoryEvictions, 1);
+	return true;
+}
+
+static unsigned int DropReadyFramesLocked(void)
+{
+	unsigned int dropped = 0;
+	for (size_t i = 0; i < STREAM_SLOT_COUNT; ++i) {
+		if (StreamSlots[i].state == StreamSlot_Ready) {
+			FreeStreamSlotLocked(&StreamSlots[i]);
+			++dropped;
+		}
+	}
+	if (dropped)
+		atomic_fetch_add(&DroppedFrames, dropped);
+	return dropped;
+}
+
+static void UpdateRetainedHighWaterLocked(void)
+{
+	unsigned int retainedFrames = 0;
+	unsigned int retainedBytes = 0;
+	for (size_t i = 0; i < STREAM_SLOT_COUNT; ++i) {
+		if (StreamSlots[i].state == StreamSlot_Free)
+			continue;
+		++retainedFrames;
+		retainedBytes += (unsigned int)StreamSlots[i].allocationSize;
+	}
+	if (retainedFrames > atomic_load(&PeakRetainedFrames))
+		atomic_store(&PeakRetainedFrames, retainedFrames);
+	if (retainedBytes > atomic_load(&PeakRetainedBytes))
+		atomic_store(&PeakRetainedBytes, retainedBytes);
 }
 
 static void DetachStreamSession(void)
@@ -320,7 +432,6 @@ static void ReleaseCaptureMemoryLocked(void)
 	}
 	StreamBuffer = NULL;
 	StreamBufferSize = 0;
-	StreamSlotCapacity = 0;
 	memset(StreamSlots, 0, sizeof(StreamSlots));
 }
 
@@ -351,6 +462,11 @@ static void ResetStatistics(void)
 	atomic_store(&NackRequests, 0);
 	atomic_store(&PictureLossRequests, 0);
 	atomic_store(&UnrecoverableNacks, 0);
+	atomic_store(&HistoryEvictions, 0);
+	atomic_store(&RecoveryRestarts, 0);
+	atomic_store(&FeedbackStalls, 0);
+	atomic_store(&PeakRetainedFrames, 0);
+	atomic_store(&PeakRetainedBytes, 0);
 	atomic_store(&ReceiverPlayoutDelayMs, 0);
 }
 
@@ -380,9 +496,6 @@ static bool PrepareCaptureForGame(void)
 		StreamBufferSize = STREAM_HEAP_SIZE;
 	}
 
-	StreamSlotCapacity = StreamBufferSize / STREAM_SLOT_COUNT;
-	for (size_t i = 0; i < STREAM_SLOT_COUNT; ++i)
-		StreamSlots[i].data = StreamBuffer + i * StreamSlotCapacity;
 	StreamSessionAttached = false;
 	ResetStreamQueueLocked(true);
 	mutexUnlock(&StreamMutex);
@@ -892,9 +1005,17 @@ static void InitializeSessionSecrets(void)
 	LatestFrameCaptureTick = 0;
 	LastSenderReportTick = 0;
 	LastDiagnosticTick = 0;
+	SessionStartTick = armGetSystemTick();
+	FirstFrameSentTick = 0;
+	LastReceiverFeedbackTick = 0;
+	LastCheckpointAdvanceTick = 0;
 	OfferSequenceNumber = 1;
 	AnswerReceived = false;
 	AnswerAccepted = false;
+	ReceiverCheckpointSeen = false;
+	StreamRecoveryRequested = false;
+	LatestReceiverCheckpointFrameId = 0;
+	StreamRecoveryReason = "none";
 	memset(&SessionAnswer, 0, sizeof(SessionAnswer));
 }
 
@@ -1158,17 +1279,21 @@ static int AcquireHistorySlot(uint32_t frameId)
 	return selected;
 }
 
+static void RequestStreamRecovery(const char* reason)
+{
+	if (StreamRecoveryRequested)
+		return;
+	StreamRecoveryRequested = true;
+	StreamRecoveryReason = reason ? reason : "unknown";
+	atomic_fetch_add(&RecoveryRestarts, 1);
+	SetCastStatus(CAST_STATUS_RECOVERING);
+}
+
 static void EnterKeyframeRecovery(void)
 {
 	mutexLock(&StreamMutex);
 	StreamAwaitingIdr = true;
-	for (size_t i = 0; i < STREAM_SLOT_COUNT; ++i) {
-		if (StreamSlots[i].state == StreamSlot_Ready) {
-			StreamSlots[i].state = StreamSlot_Free;
-			StreamSlots[i].size = 0;
-			atomic_fetch_add(&DroppedFrames, 1);
-		}
-	}
+	DropReadyFramesLocked();
 	mutexUnlock(&StreamMutex);
 }
 
@@ -1178,8 +1303,7 @@ static void ReleaseAcknowledgedHistory(uint32_t checkpoint)
 	for (size_t i = 0; i < STREAM_SLOT_COUNT; ++i) {
 		if (StreamSlots[i].state == StreamSlot_History &&
 			StreamSlots[i].frameId <= checkpoint) {
-			StreamSlots[i].state = StreamSlot_Free;
-			StreamSlots[i].size = 0;
+			FreeStreamSlotLocked(&StreamSlots[i]);
 		}
 	}
 	mutexUnlock(&StreamMutex);
@@ -1190,7 +1314,7 @@ static bool Retransmit(const CastStreamNack* nack)
 	const int index = AcquireHistorySlot(nack->frameId);
 	if (index < 0) {
 		atomic_fetch_add(&UnrecoverableNacks, 1);
-		EnterKeyframeRecovery();
+		RequestStreamRecovery("evicted_nack");
 		return true;
 	}
 
@@ -1206,6 +1330,9 @@ static bool Retransmit(const CastStreamNack* nack)
 		}
 	} else if (nack->packetId < packetCount) {
 		success = SendRtpPacket(slot, nack->packetId, true);
+	} else {
+		atomic_fetch_add(&UnrecoverableNacks, 1);
+		RequestStreamRecovery("invalid_nack");
 	}
 	ReleaseSlotToHistory(index);
 	return success;
@@ -1241,6 +1368,16 @@ static bool PumpRtcp(void)
 			continue;
 
 		if (feedback.valid) {
+			const u64 feedbackTick = armGetSystemTick();
+			LastReceiverFeedbackTick = feedbackTick;
+			if (!ReceiverCheckpointSeen ||
+				feedback.checkpointFrameId >
+					LatestReceiverCheckpointFrameId) {
+				ReceiverCheckpointSeen = true;
+				LatestReceiverCheckpointFrameId =
+					feedback.checkpointFrameId;
+				LastCheckpointAdvanceTick = feedbackTick;
+			}
 			atomic_store(
 				&ReceiverPlayoutDelayMs,
 				feedback.playoutDelayMs);
@@ -1252,6 +1389,10 @@ static bool PumpRtcp(void)
 				if (!Retransmit(&feedback.nacks[i]))
 					return false;
 			}
+			if (feedback.nackOverflow) {
+				atomic_fetch_add(&UnrecoverableNacks, 1);
+				RequestStreamRecovery("nack_overflow");
+			}
 		}
 		if (feedback.pictureLoss) {
 			atomic_fetch_add(&PictureLossRequests, 1);
@@ -1260,16 +1401,63 @@ static bool PumpRtcp(void)
 	}
 }
 
-static void SaveDiagnostic(const char* reason)
+static unsigned int TickAgeMs(u64 tick, u64 now)
 {
-	char json[1536];
+	if (tick == 0 || now <= tick)
+		return 0;
+	const uint64_t milliseconds =
+		(now - tick) * UINT64_C(1000) / armGetSystemTickFreq();
+	return milliseconds > UINT32_MAX
+		? UINT32_MAX
+		: (unsigned int)milliseconds;
+}
+
+static void SnapshotRetainedQueue(
+	unsigned int* retainedFrames,
+	unsigned int* retainedBytes,
+	unsigned int* historyFrames,
+	unsigned int* historyBytes)
+{
+	*retainedFrames = 0;
+	*retainedBytes = 0;
+	*historyFrames = 0;
+	*historyBytes = 0;
+	mutexLock(&StreamMutex);
+	for (size_t i = 0; i < STREAM_SLOT_COUNT; ++i) {
+		const StreamSlot* slot = &StreamSlots[i];
+		if (slot->state == StreamSlot_Free)
+			continue;
+		++*retainedFrames;
+		*retainedBytes += (unsigned int)slot->allocationSize;
+		if (slot->state == StreamSlot_History) {
+			++*historyFrames;
+			*historyBytes += (unsigned int)slot->allocationSize;
+		}
+	}
+	mutexUnlock(&StreamMutex);
+}
+
+static void SaveDiagnosticToPath(const char* path, const char* reason)
+{
+	char json[2304];
 	const uint8_t* octets = (const uint8_t*)&ReceiverAddress;
+	const u64 now = armGetSystemTick();
+	unsigned int retainedFrames;
+	unsigned int retainedBytes;
+	unsigned int historyFrames;
+	unsigned int historyBytes;
+	SnapshotRetainedQueue(
+		&retainedFrames,
+		&retainedBytes,
+		&historyFrames,
+		&historyBytes);
 	const int length = npf_snprintf(
 		json,
 		sizeof(json),
 		"{\n"
 		"  \"version\":\"%s\",\n"
 		"  \"reason\":\"%s\",\n"
+		"  \"status\":%u,\n"
 		"  \"transport\":\"cast-streaming-udp\",\n"
 		"  \"appId\":\"%s\",\n"
 		"  \"receiver\":\"%u.%u.%u.%u\",\n"
@@ -1277,8 +1465,23 @@ static void SaveDiagnostic(const char* reason)
 		"  \"latencyProfile\":\"%s\",\n"
 		"  \"targetDelayMs\":%u,\n"
 		"  \"receiverPlayoutDelayMs\":%u,\n"
+		"  \"sessionAgeMs\":%u,\n"
+		"  \"heartbeatAgeMs\":%u,\n"
+		"  \"receiverFeedbackAgeMs\":%u,\n"
+		"  \"checkpointAgeMs\":%u,\n"
+		"  \"lastCheckpointFrameId\":%u,\n"
+		"  \"recoveryReason\":\"%s\",\n"
 		"  \"senderSsrc\":%u,\n"
 		"  \"receiverSsrc\":%u,\n"
+		"  \"retainedFrames\":%u,\n"
+		"  \"retainedBytes\":%u,\n"
+		"  \"historyFrames\":%u,\n"
+		"  \"historyBytes\":%u,\n"
+		"  \"peakRetainedFrames\":%u,\n"
+		"  \"peakRetainedBytes\":%u,\n"
+		"  \"historyEvictions\":%u,\n"
+		"  \"recoveryRestarts\":%u,\n"
+		"  \"feedbackStalls\":%u,\n"
 		"  \"queuedFrames\":%u,\n"
 		"  \"sentFrames\":%u,\n"
 		"  \"droppedFrames\":%u,\n"
@@ -1293,6 +1496,7 @@ static void SaveDiagnostic(const char* reason)
 		"}\n",
 		SWITCHCAST_VERSION_STRING,
 		reason ? reason : "unknown",
+		atomic_load(&CastStatus),
 		CAST_STREAMING_APP_ID,
 		octets[0],
 		octets[1],
@@ -1302,8 +1506,23 @@ static void SaveDiagnostic(const char* reason)
 		IsUltraLowLatency() ? "ultra" : "stable",
 		Cast_GetTargetDelayMs(),
 		atomic_load(&ReceiverPlayoutDelayMs),
+		TickAgeMs(SessionStartTick, now),
+		TickAgeMs(LastHeartbeatTick, now),
+		TickAgeMs(LastReceiverFeedbackTick, now),
+		TickAgeMs(LastCheckpointAdvanceTick, now),
+		LatestReceiverCheckpointFrameId,
+		StreamRecoveryReason,
 		SenderSsrc,
 		ReceiverSsrc,
+		retainedFrames,
+		retainedBytes,
+		historyFrames,
+		historyBytes,
+		atomic_load(&PeakRetainedFrames),
+		atomic_load(&PeakRetainedBytes),
+		atomic_load(&HistoryEvictions),
+		atomic_load(&RecoveryRestarts),
+		atomic_load(&FeedbackStalls),
 		atomic_load(&QueuedFrames),
 		atomic_load(&SentFrames),
 		atomic_load(&DroppedFrames),
@@ -1316,7 +1535,35 @@ static void SaveDiagnostic(const char* reason)
 		atomic_load(&PictureLossRequests),
 		atomic_load(&UnrecoverableNacks));
 	if (length > 0 && (size_t)length < sizeof(json))
-		CoreWriteSdFile(CAST_DIAGNOSTIC_PATH, json, (u64)length);
+		CoreWriteSdFile(path, json, (u64)length);
+}
+
+static void SaveDiagnostic(const char* reason)
+{
+	SaveDiagnosticToPath(CAST_DIAGNOSTIC_PATH, reason);
+}
+
+static void SaveFailureDiagnostic(const char* reason)
+{
+	SaveDiagnosticToPath(CAST_DIAGNOSTIC_PATH, reason);
+	SaveDiagnosticToPath(CAST_LAST_FAILURE_PATH, reason);
+}
+
+static bool ReceiverFeedbackStalled(u64 now)
+{
+	if (FirstFrameSentTick == 0)
+		return false;
+	const bool hasOutstandingFrames =
+		!ReceiverCheckpointSeen ||
+		LatestReceiverCheckpointFrameId < LatestFrameId;
+	if (!hasOutstandingFrames)
+		return false;
+	const u64 progressTick = ReceiverCheckpointSeen
+		? LastCheckpointAdvanceTick
+		: FirstFrameSentTick;
+	return progressTick != 0 &&
+		now - progressTick >=
+			armGetSystemTickFreq() * STREAM_FEEDBACK_STALL_MS / 1000;
 }
 
 static StreamSessionResult RunStreamSession(void)
@@ -1340,6 +1587,10 @@ static StreamSessionResult RunStreamSession(void)
 				result = StreamSession_Failed;
 			break;
 		}
+		if (StreamRecoveryRequested) {
+			result = StreamSession_Recover;
+			break;
+		}
 
 		const int index = AcquireReadySlot();
 		if (index >= 0) {
@@ -1352,6 +1603,7 @@ static StreamSessionResult RunStreamSession(void)
 			ReleaseSlotToHistory(index);
 			if (!sentFirstFrame) {
 				sentFirstFrame = true;
+				FirstFrameSentTick = armGetSystemTick();
 				SetCastStatus(CAST_STATUS_STREAMING);
 				SaveDiagnostic("streaming_started");
 			}
@@ -1387,6 +1639,15 @@ static StreamSessionResult RunStreamSession(void)
 			sentFirstFrame && HasRecentGameplay());
 
 		const u64 now = armGetSystemTick();
+		if (ReceiverFeedbackStalled(now)) {
+			atomic_fetch_add(&FeedbackStalls, 1);
+			RequestStreamRecovery(
+				ReceiverCheckpointSeen
+					? "checkpoint_stalled"
+					: "feedback_missing");
+			result = StreamSession_Recover;
+			break;
+		}
 		if (now - LastDiagnosticTick >=
 			armGetSystemTickFreq() * STREAM_DIAGNOSTIC_INTERVAL_SECONDS) {
 			LastDiagnosticTick = now;
@@ -1429,7 +1690,7 @@ bool Cast_WriteH264(
 		mutexUnlock(&StreamMutex);
 		return true;
 	}
-	if (annexBSize == 0 || annexBSize > StreamSlotCapacity) {
+	if (annexBSize == 0 || annexBSize > StreamBufferSize) {
 		atomic_fetch_add(&OversizedFrames, 1);
 		atomic_fetch_add(&DroppedFrames, 1);
 		StreamAwaitingIdr = true;
@@ -1438,48 +1699,42 @@ bool Cast_WriteH264(
 	}
 
 	int selected = -1;
-	uint64_t oldestHistory = UINT64_MAX;
-	for (size_t i = 0; i < STREAM_SLOT_COUNT; ++i) {
-		if (StreamSlots[i].state == StreamSlot_Free) {
-			selected = (int)i;
+	size_t frameOffset = 0;
+	size_t allocationSize = 0;
+	bool droppedReadyForPressure = false;
+	for (;;) {
+		selected = FindFreeStreamSlotLocked();
+		if (selected >= 0 &&
+			FindFreeFrameRegionLocked(
+				annexBSize,
+				&frameOffset,
+				&allocationSize))
 			break;
-		}
-		if (StreamSlots[i].state == StreamSlot_History &&
-			StreamSlots[i].order < oldestHistory) {
-			selected = (int)i;
-			oldestHistory = StreamSlots[i].order;
-		}
-	}
-
-	if (selected < 0) {
-		for (size_t i = 0; i < STREAM_SLOT_COUNT; ++i) {
-			if (StreamSlots[i].state == StreamSlot_Ready) {
-				StreamSlots[i].state = StreamSlot_Free;
-				StreamSlots[i].size = 0;
+		if (EvictOldestHistoryLocked())
+			continue;
+		if (!droppedReadyForPressure) {
+			droppedReadyForPressure = true;
+			DropReadyFramesLocked();
+			StreamAwaitingIdr = true;
+			if (!randomAccess) {
+				atomic_fetch_add(&DroppedFrames, 1);
+				mutexUnlock(&StreamMutex);
+				return true;
 			}
+			continue;
 		}
+		atomic_fetch_add(&DroppedFrames, 1);
 		StreamAwaitingIdr = true;
-		atomic_fetch_add(&DroppedFrames, 1);
-		if (!randomAccess) {
-			mutexUnlock(&StreamMutex);
-			return true;
-		}
-		for (size_t i = 0; i < STREAM_SLOT_COUNT; ++i) {
-			if (StreamSlots[i].state == StreamSlot_Free) {
-				selected = (int)i;
-				break;
-			}
-		}
-	}
-	if (selected < 0) {
-		atomic_fetch_add(&DroppedFrames, 1);
 		mutexUnlock(&StreamMutex);
 		return true;
 	}
 
 	StreamSlot* slot = &StreamSlots[selected];
+	slot->data = StreamBuffer + frameOffset;
 	memcpy(slot->data, annexB, annexBSize);
 	slot->size = annexBSize;
+	slot->offset = frameOffset;
+	slot->allocationSize = allocationSize;
 	slot->order = StreamNextOrder++;
 	slot->captureTick = armGetSystemTick();
 	slot->rtpTimestamp =
@@ -1489,6 +1744,7 @@ bool Cast_WriteH264(
 	slot->state = StreamSlot_Ready;
 	StreamAwaitingIdr = false;
 	atomic_fetch_add(&QueuedFrames, 1);
+	UpdateRetainedHighWaterLocked();
 	mutexUnlock(&StreamMutex);
 	return true;
 }
@@ -1609,8 +1865,18 @@ void Cast_ServerThread(void* unused)
 		}
 
 		const StreamSessionResult sessionResult = RunStreamSession();
-		if (sessionResult == StreamSession_GameplayStopped)
+		if (sessionResult == StreamSession_GameplayStopped) {
 			SaveDiagnostic("gameplay_stopped");
+		} else if (sessionResult == StreamSession_Recover) {
+			SaveFailureDiagnostic(StreamRecoveryReason);
+		} else if (sessionResult == StreamSession_Failed) {
+			const uint32_t status = Cast_GetStatus();
+			if (!IsControlFailureStatus(status) &&
+				status != CAST_STATUS_RECEIVER_CLOSED &&
+				status != CAST_STATUS_PACKET_ERROR)
+				SetCastStatus(CAST_STATUS_NETWORK_ERROR);
+			SaveFailureDiagnostic("stream_failed");
+		}
 		DetachStreamSession();
 		StopReceiver();
 		CloseCastConnection();
@@ -1621,13 +1887,11 @@ void Cast_ServerThread(void* unused)
 			ArmCaptureForNextGame();
 			continue;
 		}
+		if (sessionResult == StreamSession_Recover) {
+			svcSleepThread(250E+6);
+			continue;
+		}
 		if (sessionResult == StreamSession_Failed) {
-			const uint32_t status = Cast_GetStatus();
-			if (!IsControlFailureStatus(status) &&
-				status != CAST_STATUS_RECEIVER_CLOSED &&
-				status != CAST_STATUS_PACKET_ERROR)
-				SetCastStatus(CAST_STATUS_NETWORK_ERROR);
-			SaveDiagnostic("stream_failed");
 			if (!IsApplicationRunning() || !HasRecentGameplay())
 				ArmCaptureForNextGame();
 			else

@@ -1,0 +1,49 @@
+name: SwitchCast release build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - SwitchCastConfig/**
+      - sysmodule/**
+      - tests/**
+      - release-template/**
+      - ReleaseSysmodule.sh
+      - README.md
+      - CASTING.md
+      - BRANDING.md
+      - NOTICE.md
+      - THIRD-PARTY-NOTICES.md
+      - SYSDVR-ATTRIBUTION.md
+      - LICENSE
+  pull_request:
+    branches: [ main ]
+    paths:
+      - SwitchCastConfig/**
+      - sysmodule/**
+      - tests/**
+      - ReleaseSysmodule.sh
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: devkitpro/devkita64:latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install release dependencies
+      run: |
+        apt-get update
+        apt-get install -y build-essential zip
+        dkp-pacman -Syu --noconfirm
+        dkp-pacman -S --needed --noconfirm \
+          switch-curl switch-zlib switch-glfw switch-mesa \
+          switch-libdrm_nouveau
+    - name: Build and test SwitchCast
+      run: ./ReleaseSysmodule.sh
+    - uses: actions/upload-artifact@v4
+      with:
+        name: SwitchCast-standalone
+        path: build-release/SwitchCast-Standalone-*.zip
+        if-no-files-found: error

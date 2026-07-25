@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.2 — 2026-07-25
+
+- Replaced three fixed media slots with a variable-size, up-to-24-frame
+  retransmission history using the same temporary 2 MiB heap.
+- Added controlled Cast media-session recovery for evicted NACK requests,
+  bounded-NACK overflow, and stalled receiver checkpoint progress.
+- Preserved failure and recovery evidence in
+  `/config/switchcast/last-failure.json`.
+- Added retained-history, feedback-age, checkpoint-age, eviction, high-water,
+  and recovery telemetry to the JSON diagnostics.
+- Kept the 90 ms Ultra-low and 150 ms Stable timing profiles unchanged.
+
 ## 0.3.1 — 2026-07-24
 
 - Added an optional setting to blank the Switch backlight while gameplay video

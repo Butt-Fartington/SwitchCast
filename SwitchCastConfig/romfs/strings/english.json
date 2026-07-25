@@ -90,7 +90,7 @@
     "CastStatusControlSocketClosed": "Cast control socket closed",
     "CastStatusReceiverStatusTimeout": "Receiver did not return Cast app status",
     "CastStatusAppIdMissing": "Reserved SwitchCast state 29",
-    "CastStatusReceiverReadyTimeout": "Reserved SwitchCast state 30",
+    "CastStatusReceiverReadyTimeout": "Refreshing the Cast media session after interrupted feedback",
     "CastStatusReceiverStreamError": "Reserved SwitchCast state 31",
     "CastStatusMediaErrorCode": "Receiver media error code",
     "OptGuide": "Guide",

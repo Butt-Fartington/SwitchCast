@@ -323,8 +323,10 @@ static void AddNack(
 	uint32_t frameId,
 	uint16_t packetId)
 {
-	if (feedback->nackCount >= CAST_STREAM_MAX_NACKS)
+	if (feedback->nackCount >= CAST_STREAM_MAX_NACKS) {
+		feedback->nackOverflow = true;
 		return;
+	}
 	feedback->nacks[feedback->nackCount].frameId = frameId;
 	feedback->nacks[feedback->nackCount].packetId = packetId;
 	++feedback->nackCount;

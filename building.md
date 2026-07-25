@@ -33,6 +33,12 @@ Run the host-side Cast checks:
 ```sh
 mkdir -p build-host
 cc -std=c11 -Wall -Wextra -Werror -O2 \
+  sysmodule/source/cast/frame_arena.c \
+  tests/test_frame_arena.c \
+  -o build-host/test_frame_arena
+./build-host/test_frame_arena
+
+cc -std=c11 -Wall -Wextra -Werror -O2 \
   sysmodule/source/cast/cast_streaming.c \
   tests/test_cast_streaming.c \
   -o build-host/test_cast_streaming
@@ -68,4 +74,4 @@ switch/SwitchCast.nro
 
 `ReleaseSysmodule.sh` performs a clean two-binary build, runs the host checks,
 assembles the SD-card layout, includes all attribution and license documents,
-and writes `build-release/SwitchCast-Standalone-v0.3.1.zip`.
+and writes `build-release/SwitchCast-Standalone-v0.3.2.zip`.

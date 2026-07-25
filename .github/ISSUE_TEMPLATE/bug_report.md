@@ -28,7 +28,8 @@ reproduces it.
 
 ## Diagnostics
 
-Attach `/config/switchcast/debug.json` and
+Attach `/config/switchcast/debug.json`,
+`/config/switchcast/last-failure.json`, and
 `/config/switchcast/error.json` when present. Remove anything you consider
 private before posting.
 

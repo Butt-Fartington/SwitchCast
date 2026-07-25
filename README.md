@@ -1,4 +1,4 @@
-# SwitchCast 0.3.1
+# SwitchCast 0.3.2
 
 ![SwitchCast controller-and-video mark](work/assets/switchcast-controller-mark.png)
 
@@ -31,6 +31,19 @@ This repository is maintained as a fork of SysDVR so GitHub also preserves
 the upstream commit history and displays the relationship on every repository
 page. The SwitchCast work is based on SysDVR snapshot
 [`804fd36`](https://github.com/exelix11/SysDVR/commit/804fd36e54983b7c76b249059b159f896af35b4d).
+
+## New in 0.3.2
+
+- The same temporary 2 MiB media heap now uses variable-size frame allocations
+  and can retain up to 24 encoded frames instead of three fixed partitions.
+- Late packet-loss feedback has a much deeper retransmission window without
+  increasing the sysmodule memory budget or receiver delay.
+- Unrecoverable NACKs and stalled receiver checkpoints refresh the native Cast
+  media session automatically while the gameplay capture remains active.
+- `/config/switchcast/last-failure.json` preserves the final recovery snapshot
+  even after a successful automatic reconnection.
+- Diagnostics now include retained history, arena high-water marks, evictions,
+  feedback age, checkpoint age, recovery count, and the recovery reason.
 
 ## New in 0.3.1
 
@@ -79,7 +92,8 @@ manager are not linked.
 - Native OFFER/ANSWER negotiation for 1280x720 H.264 video.
 - AES-128-CTR frame encryption using the Switch's hardware AES implementation.
 - Cast RTP packetization, RTCP feedback, retransmission, and keyframe recovery.
-- A three-frame, 2 MiB game-only queue with no permanent media heap.
+- A variable-size, up-to-24-frame history in a 2 MiB game-only arena with no
+  permanent media heap.
 - Selectable 90 ms ultra-low and 150 ms stable video timing profiles.
 - Automatic capture start when a compatible game launches.
 - Clean session teardown and automatic rearming when a game or homebrew title
@@ -92,7 +106,7 @@ because an ordinary homebrew app cannot stay active beside a retail game.
 
 ## Install
 
-1. Extract `SwitchCast-Standalone-v0.3.1.zip` to the SD-card root.
+1. Extract `SwitchCast-Standalone-v0.3.2.zip` to the SD-card root.
 2. Reboot the console.
 3. Open `/switch/SwitchCast.nro` from the Homebrew Menu.
 4. Select **SwitchCast**, then choose a receiver from the discovered list.
@@ -112,17 +126,17 @@ command. Contributions are welcome under the requirements in
 
 ### Upgrading
 
-Version 0.3.1 can be copied directly over 0.3.0 or 0.2.1. The sysmodule and
+Version 0.3.2 can be copied directly over 0.3.1, 0.3.0, or 0.2.1. The sysmodule and
 Settings application must both come from the same release because screen
 blanking and live latency metrics extend the SwitchCast IPC protocol.
 
 ### Upgrading from the 0.1.0 prototype
 
 The prototype occupied the SysDVR content directory
-`/atmosphere/contents/00FF0000A53BB665`. Version 0.3.1 does not overwrite or
+`/atmosphere/contents/00FF0000A53BB665`. Version 0.3.2 does not overwrite or
 remove that directory.
 
-Before testing 0.3.1, make sure the old prototype or SysDVR is not also
+Before testing 0.3.2, make sure the old prototype or SysDVR is not also
 streaming or enabled at boot. Two capture sysmodules can compete for memory and
 the capture service. If `00FF0000A53BB665` contains the old SwitchCast
 prototype, restore your SysDVR backup or remove that old prototype directory.
@@ -144,6 +158,7 @@ prototype, restore your SysDVR backup or remove that old prototype directory.
 /config/switchcast/latency_profile  `ultra` (90 ms) or `stable` (150 ms)
 /config/switchcast/blank_screen     blank the console backlight during video
 /config/switchcast/debug.json       live transport and recovery statistics
+/config/switchcast/last-failure.json preserved final stream failure/recovery
 /config/switchcast/error.json       rejected Cast response, when available
 ```
 
