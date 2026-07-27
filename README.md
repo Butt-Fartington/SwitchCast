@@ -1,4 +1,4 @@
-# SwitchCast 0.4.1
+# SwitchCast 0.4.2
 
 ![SwitchCast controller-and-video mark](work/assets/switchcast-controller-mark.png)
 
@@ -37,6 +37,18 @@ This repository is maintained as a fork of SysDVR so GitHub also preserves
 the upstream commit history and displays the relationship on every repository
 page. The SwitchCast work is based on SysDVR snapshot
 [`804fd36`](https://github.com/exelix11/SysDVR/commit/804fd36e54983b7c76b249059b159f896af35b4d).
+
+## New in 0.4.2
+
+- Replaced libnx's indefinite synchronous USB transfers with a
+  SysDVR-derived timeout-and-cancel transport. A cable loss can no longer
+  carry an old gameplay, audio, or keepalive packet into the next connection.
+- Added a hard one-second host-loss boundary. The old endpoint request is
+  cancelled, the console screen is restored, and the next plug begins with a
+  fresh protocol greeting and session generation.
+- Kept the validated video, PCM audio, screen-blanking, and Dock decoding
+  paths unchanged.
+- Compatible with the existing SwitchCast Dock 0.1.16 image.
 
 ## New in 0.4.1
 
@@ -111,7 +123,8 @@ page. The SwitchCast work is based on SysDVR snapshot
   and more conservative packet pacing.
 - Changing latency profiles while enabled automatically restarts the video
   session so the next Cast negotiation uses the new setting.
-- Cast audio remains disabled. USB Dock audio is enabled in 0.4.1; game sound
+- Cast audio remains disabled. USB Dock audio is enabled in 0.4.1 and later;
+  game sound
   can still be played locally when using Cast over Wi-Fi.
 
 ## Standalone SwitchCast
@@ -153,7 +166,7 @@ because an ordinary homebrew app cannot stay active beside a retail game.
 
 ## Install
 
-1. Extract `SwitchCast-Standalone-v0.4.1.zip` to the SD-card root.
+1. Extract `SwitchCast-Standalone-v0.4.2.zip` to the SD-card root.
 2. Reboot the console.
 3. Open `/switch/SwitchCast.nro` from the Homebrew Menu.
 4. Choose **Cast over Wi-Fi** and a receiver, or choose **USB Dock** and start
@@ -174,7 +187,7 @@ command. Contributions are welcome under the requirements in
 
 ### Upgrading
 
-Version 0.4.1 can be copied directly over 0.4.0, 0.3.2, 0.3.1, 0.3.0, or
+Version 0.4.2 can be copied directly over 0.4.1, 0.4.0, 0.3.2, 0.3.1, 0.3.0, or
 0.2.1. The
 sysmodule and Settings application must both come from the same release
 because the transport selector extends the SwitchCast IPC protocol.
@@ -182,10 +195,10 @@ because the transport selector extends the SwitchCast IPC protocol.
 ### Upgrading from the 0.1.0 prototype
 
 The prototype occupied the SysDVR content directory
-`/atmosphere/contents/00FF0000A53BB665`. Version 0.4.1 does not overwrite or
+`/atmosphere/contents/00FF0000A53BB665`. Version 0.4.2 does not overwrite or
 remove that directory.
 
-Before testing 0.4.1, make sure the old prototype or SysDVR is not also
+Before testing 0.4.2, make sure the old prototype or SysDVR is not also
 streaming or enabled at boot. Two capture sysmodules can compete for memory and
 the capture service. If `00FF0000A53BB665` contains the old SwitchCast
 prototype, restore your SysDVR backup or remove that old prototype directory.

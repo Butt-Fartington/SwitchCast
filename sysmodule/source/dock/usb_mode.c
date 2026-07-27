@@ -10,15 +10,13 @@
 #include <stdatomic.h>
 #include <string.h>
 #include <switch.h>
-#include <switch/runtime/devices/usb_comms.h>
 
 #include "../capture.h"
 #include "../cast/cast.h"
 #include "../modes/modes.h"
 #include "usb_proto.h"
+#include "usb_transport.h"
 
-#define SWITCHCAST_USB_VENDOR_ID UINT16_C(0x18D1)
-#define SWITCHCAST_USB_PRODUCT_ID UINT16_C(0x4EE0)
 #define USB_KEEPALIVE_INTERVAL_NS UINT64_C(500000000)
 #define USB_VIDEO_FRESHNESS_NS UINT64_C(1500000000)
 #define USB_SUPERVISOR_INTERVAL_NS UINT64_C(100000000)
@@ -46,7 +44,7 @@ static bool UsbWriteRaw(const void* data, size_t size)
 	mutexLock(&UsbIoMutex);
 	success =
 		atomic_load(&IsThreadRunning) &&
-		usbCommsWrite(data, size) == size;
+		UsbTransportWrite(data, size);
 	mutexUnlock(&UsbIoMutex);
 	return success;
 }
@@ -58,7 +56,7 @@ static bool UsbReadRaw(void* data, size_t size)
 	mutexLock(&UsbIoMutex);
 	success =
 		atomic_load(&IsThreadRunning) &&
-		usbCommsRead(data, size) == size;
+		UsbTransportRead(data, size);
 	mutexUnlock(&UsbIoMutex);
 	return success;
 }
@@ -91,7 +89,7 @@ static bool UsbWriteConnected(const void* data, size_t size)
 	success =
 		atomic_load(&IsThreadRunning) &&
 		atomic_load(&UsbClientConnected) &&
-		usbCommsWrite(data, size) == size;
+		UsbTransportWrite(data, size);
 	mutexUnlock(&UsbIoMutex);
 	if (!success && atomic_load(&UsbClientConnected)) {
 		atomic_store(&UsbStatus, USB_STATUS_IO_ERROR);
@@ -293,12 +291,6 @@ static void UsbSupervisor(void* unused)
 
 static void UsbInitializeMode(void)
 {
-	const UsbCommsInterfaceInfo interfaceInfo = {
-		.bInterfaceClass = USB_CLASS_VENDOR_SPEC,
-		.bInterfaceSubClass = USB_CLASS_VENDOR_SPEC,
-		.bInterfaceProtocol = USB_CLASS_VENDOR_SPEC,
-	};
-
 	UsbInitialized = false;
 	UsbAudioInitialized = false;
 	mutexInit(&UsbIoMutex);
@@ -316,14 +308,9 @@ static void UsbInitializeMode(void)
 	}
 	UsbAudioInitialized = true;
 
-	usbCommsSetErrorHandling(false);
-	rc = usbCommsInitializeEx(
-		1,
-		&interfaceInfo,
-		SWITCHCAST_USB_VENDOR_ID,
-		SWITCHCAST_USB_PRODUCT_ID);
+	rc = UsbTransportInitialize();
 	if (R_FAILED(rc)) {
-		LOG("usbCommsInitializeEx failed: %x\n", rc);
+		LOG("UsbTransportInitialize failed: %x\n", rc);
 		CaptureFinalizeAudio();
 		UsbAudioInitialized = false;
 		atomic_store(&UsbStatus, USB_STATUS_INIT_ERROR);
@@ -345,7 +332,7 @@ static void UsbExitMode(void)
 {
 	UsbDisconnectClient();
 	if (UsbInitialized)
-		usbCommsExit();
+		UsbTransportExit();
 	UsbInitialized = false;
 	if (UsbAudioInitialized)
 		CaptureFinalizeAudio();

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.2 — 2026-07-27
+
+- Replaced indefinite libnx USB writes with the SysDVR-derived
+  timeout-and-cancel endpoint transport.
+- Added a one-second deadline for every Dock transfer so physical cable loss
+  cannot leave media or keepalive data pending across a replug.
+- Restored the Switch panel and advanced the logical session immediately when
+  an endpoint request times out.
+- Preserved the validated H.264, PCM audio, and SwitchCast Dock 0.1.16
+  pipelines.
+
 ## 0.4.1 — 2026-07-26
 
 - Added independent USB keepalive and gameplay-freshness supervision.

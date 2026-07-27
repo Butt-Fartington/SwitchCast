@@ -21,6 +21,9 @@ Substantial foundations inherited or adapted from SysDVR include:
   capture-compatibility behavior.
 - USB device identity, protocol-03 handshake, packed video framing, and the
   direct USB transport design used by SwitchCast Dock mode.
+- The timeout-and-cancel USB endpoint implementation adapted in SwitchCast
+  0.4.2 from SysDVR's `UsbComms.c` and `Serial.c`, which provides the hard
+  disconnect boundary needed for reliable physical unplug/replug recovery.
 - The memory-conscious Atmosphère sysmodule architecture and static-buffer
   approach.
 - The original build, packaging, process-management, and IPC foundations.
@@ -39,10 +42,10 @@ installed at runtime. They do **not** erase the project's lineage. SwitchCast
 is a derivative work of SysDVR and remains distributed under the **GNU General
 Public License version 2**.
 
-Legacy SysDVR PC clients, TCP/RTSP transports, general-purpose USB mode, and
-audio pipeline are not part of the standalone SwitchCast build or public
-source set. SwitchCast 0.4.0 instead includes a minimal video-only USB Dock
-transport with the same protocol lineage. Excluding the other unused
+Legacy SysDVR PC clients and TCP/RTSP transports are not part of the
+standalone SwitchCast build or public source set. SwitchCast's dedicated USB
+Dock mode uses the same protocol lineage, SysDVR-derived endpoint transport,
+and PCM format in a purpose-built receiver path. Excluding other unused
 subsystems keeps the published tree aligned with the binaries; it does not
 change the credit for the substantial SysDVR code that remains.
 

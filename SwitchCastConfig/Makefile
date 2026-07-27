@@ -46,7 +46,7 @@ ROMFS		:=	romfs
 
 APP_TITLE	:=	SwitchCast
 APP_AUTHOR	:=	Based on SysDVR by Exelix11 and contributors
-APP_VERSION	:=	0.4.1
+APP_VERSION	:=	0.4.2
 
 #---------------------------------------------------------------------------------
 # options for code generation
