@@ -15,6 +15,8 @@ typedef struct {
 	void (*ExitFn)(void);
 	void (*VThread)(void*);
 	void* Vargs;
+	void (*AThread)(void*);
+	void* Aargs;
 } StreamMode;
 
 typedef union {
@@ -29,6 +31,8 @@ typedef union {
 	} CastMode;
 	struct {
 		u8 alignas(0x1000) EndpointPages[2][0x1000];
+		u8 alignas(0x1000)
+			SupervisorThreadStackArea[0x2000 + LOGGING_STACK_BOOST];
 	} UsbMode;
 } StaticBuffers;
 

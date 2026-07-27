@@ -13,6 +13,7 @@
 #define META_VIDEO (UINT8_C(1) << 0)
 #define META_AUDIO (UINT8_C(1) << 1)
 #define VIDEO_INJECT_SPS_PPS (UINT8_C(1) << 1)
+#define FEATURE_KEEPALIVE (UINT8_C(1) << 2)
 
 static uint32_t ReadLe32(const uint8_t* bytes)
 {
@@ -46,13 +47,14 @@ SwitchCastUsbHandshakeResult SwitchCastUsbParseRequest(
 		return SwitchCastUsbHandshake_WrongVersion;
 	if ((bytes[6] & (META_VIDEO | META_AUDIO)) == 0)
 		return SwitchCastUsbHandshake_InvalidMeta;
-	if ((bytes[6] & META_AUDIO) != 0)
-		return SwitchCastUsbHandshake_InvalidChannel;
 	if ((bytes[6] & META_VIDEO) == 0)
 		return SwitchCastUsbHandshake_InvalidMeta;
 
 	request->injectSpsPps =
 		(bytes[7] & VIDEO_INJECT_SPS_PPS) != 0;
+	request->audioEnabled = (bytes[6] & META_AUDIO) != 0;
+	request->keepaliveEnabled =
+		(bytes[9] & FEATURE_KEEPALIVE) != 0;
 	return SwitchCastUsbHandshake_Ok;
 }
 

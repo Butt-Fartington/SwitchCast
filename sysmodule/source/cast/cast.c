@@ -84,6 +84,8 @@ static atomic_uint CaptureGeneration = 0;
 static atomic_bool BlankScreenEnabled = false;
 static atomic_bool SettingsVisible = false;
 static bool ProcessMonitorInitialized;
+static Mutex ScreenBlankingMutex;
+static bool ScreenBlankingMutexReady;
 static bool ScreenBlankingApplied;
 static bool ScreenBlankedBySwitchCast;
 
@@ -195,6 +197,10 @@ bool Cast_GetBlankScreenEnabled(void)
 
 void Cast_SetBlankScreenEnabled(bool enabled)
 {
+	if (!ScreenBlankingMutexReady) {
+		mutexInit(&ScreenBlankingMutex);
+		ScreenBlankingMutexReady = true;
+	}
 	atomic_store(&BlankScreenEnabled, enabled);
 }
 
@@ -205,47 +211,60 @@ void Cast_SetSettingsVisible(bool visible)
 
 void Cast_UpdateConsoleScreenBlanking(bool videoActive)
 {
+	if (!ScreenBlankingMutexReady) {
+		mutexInit(&ScreenBlankingMutex);
+		ScreenBlankingMutexReady = true;
+	}
+	mutexLock(&ScreenBlankingMutex);
 	const bool shouldBlank =
 		videoActive &&
 		atomic_load(&BlankScreenEnabled) &&
 		!atomic_load(&SettingsVisible);
 	if (shouldBlank) {
-		if (ScreenBlankingApplied)
+		if (ScreenBlankingApplied) {
+			mutexUnlock(&ScreenBlankingMutex);
 			return;
+		}
 		const UtilScreenModeResult result =
 			UtilSetConsoleScreenMode(false);
-		if (result == UtilScreenMode_Failed)
+		if (result == UtilScreenMode_Failed) {
+			mutexUnlock(&ScreenBlankingMutex);
 			return;
+		}
 		ScreenBlankingApplied = true;
 		ScreenBlankedBySwitchCast =
 			result == UtilScreenMode_Changed;
+		mutexUnlock(&ScreenBlankingMutex);
 		return;
 	}
 
-	if (!ScreenBlankingApplied)
+	if (!ScreenBlankingApplied) {
+		mutexUnlock(&ScreenBlankingMutex);
 		return;
+	}
 	if (!ScreenBlankedBySwitchCast) {
 		// The backlight was already off before SwitchCast touched it.
 		ScreenBlankingApplied = false;
+		mutexUnlock(&ScreenBlankingMutex);
 		return;
 	}
 
 	const UtilScreenModeResult result =
 		UtilSetConsoleScreenMode(true);
-	if (result == UtilScreenMode_Failed)
+	if (result == UtilScreenMode_Failed) {
+		mutexUnlock(&ScreenBlankingMutex);
 		return;
+	}
 	ScreenBlankingApplied = false;
 	ScreenBlankedBySwitchCast = false;
+	mutexUnlock(&ScreenBlankingMutex);
 }
 
 static void RestoreConsoleScreen(void)
 {
-	for (
-		unsigned int attempt = 0;
-		attempt < 3 && ScreenBlankingApplied;
-		++attempt) {
+	for (unsigned int attempt = 0; attempt < 3; ++attempt) {
 		Cast_UpdateConsoleScreenBlanking(false);
-		if (ScreenBlankingApplied)
+		if (attempt < 2)
 			svcSleepThread(20E+6);
 	}
 }

@@ -15,6 +15,7 @@ AudioPacket alignas(0x1000) APkt;
 
 static Service grcdVideo;
 static Service grcdAudio;
+static bool grcdAudioOpen;
 
 // To support disabling and enabling sysdvr without rebooting the console we now don't call grcdServiceBegin on start.
 // This is because this function globally enables a flag in grc, when this is called with the flag already set it will cause the console to crash
@@ -360,7 +361,26 @@ Result CaptureInitialize()
 	return grcdServiceOpen(&grcdVideo);
 }
 
+Result CaptureInitializeAudio()
+{
+	if (grcdAudioOpen)
+		return 0;
+	const Result rc = grcdServiceOpen(&grcdAudio);
+	if (R_SUCCEEDED(rc))
+		grcdAudioOpen = true;
+	return rc;
+}
+
+void CaptureFinalizeAudio()
+{
+	if (!grcdAudioOpen)
+		return;
+	grcdServiceClose(&grcdAudio);
+	grcdAudioOpen = false;
+}
+
 void CaptureFinalize()
 {
+	CaptureFinalizeAudio();
 	grcdServiceClose(&grcdVideo);
 }

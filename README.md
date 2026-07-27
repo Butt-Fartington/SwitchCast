@@ -1,4 +1,4 @@
-# SwitchCast 0.4.0
+# SwitchCast 0.4.1
 
 ![SwitchCast controller-and-video mark](work/assets/switchcast-controller-mark.png)
 
@@ -37,6 +37,24 @@ This repository is maintained as a fork of SysDVR so GitHub also preserves
 the upstream commit history and displays the relationship on every repository
 page. The SwitchCast work is based on SysDVR snapshot
 [`804fd36`](https://github.com/exelix11/SysDVR/commit/804fd36e54983b7c76b249059b159f896af35b4d).
+
+## New in 0.4.1
+
+- Added an independent USB liveness supervisor. A matched Dock requests tiny
+  protocol keepalives, so cable loss is detected even while gameplay capture
+  is blocked waiting for a title.
+- Added a 1.5-second gameplay freshness watchdog. The Switch panel is restored
+  when video stops without waiting for the capture call or USB session to
+  unwind.
+- Added SysDVR-compatible 48 kHz, 16-bit stereo PCM to USB Dock mode. Audio
+  uses its own capture thread and serialized USB writes; Cast over Wi-Fi
+  remains deliberately video-only.
+- Preserved the screen-blank safety rules: never blank SwitchCast Settings,
+  blank only after a delivered gameplay frame, and restore on pause,
+  disconnect, backend change, or shutdown.
+- Paired this release with SwitchCast Dock 0.1.16, which adds low-buffer HDMI
+  audio, a professional Ready/status display, video-idle teardown and resume,
+  endpoint cleanup, and more reliable reconnects.
 
 ## New in 0.4.0
 
@@ -93,8 +111,8 @@ page. The SwitchCast work is based on SysDVR snapshot
   and more conservative packet pacing.
 - Changing latency profiles while enabled automatically restarts the video
   session so the next Cast negotiation uses the new setting.
-- Audio remains disabled. Game sound can continue playing locally without
-  consuming SwitchCast's memory or Cast transport budget.
+- Cast audio remains disabled. USB Dock audio is enabled in 0.4.1; game sound
+  can still be played locally when using Cast over Wi-Fi.
 
 ## Standalone SwitchCast
 
@@ -107,8 +125,9 @@ SwitchCast has its own:
 
 The installed binaries do not require, launch, replace, or communicate with a
 separate SysDVR installation. The sysmodule compiles Switch capture, Cast and
-USB Dock transports, and its small IPC controller; TCP, RTSP, audio, and the
-legacy mode manager are not linked.
+USB Dock transports, and its small IPC controller; TCP, RTSP, and the legacy
+mode manager are not linked. The second grc:d audio session is opened only
+while USB Dock mode is active.
 
 ## What is included
 
@@ -125,15 +144,16 @@ legacy mode manager are not linked.
 - Automatic capture start when a compatible game launches.
 - Clean session teardown and automatic rearming when a game or homebrew title
   exits, including receiver CLOSE messages during that transition.
-- Video only. Audio remains deliberately disabled to protect memory and
-  latency.
+- Cast mode remains video-only to protect its memory and latency budget. USB
+  Dock mode adds native stereo PCM without coupling audio timing to the video
+  decoder queue.
 
 The foreground NRO is only the controller. The dedicated sysmodule is required
 because an ordinary homebrew app cannot stay active beside a retail game.
 
 ## Install
 
-1. Extract `SwitchCast-Standalone-v0.4.0.zip` to the SD-card root.
+1. Extract `SwitchCast-Standalone-v0.4.1.zip` to the SD-card root.
 2. Reboot the console.
 3. Open `/switch/SwitchCast.nro` from the Homebrew Menu.
 4. Choose **Cast over Wi-Fi** and a receiver, or choose **USB Dock** and start
@@ -154,17 +174,18 @@ command. Contributions are welcome under the requirements in
 
 ### Upgrading
 
-Version 0.4.0 can be copied directly over 0.3.2, 0.3.1, 0.3.0, or 0.2.1. The
+Version 0.4.1 can be copied directly over 0.4.0, 0.3.2, 0.3.1, 0.3.0, or
+0.2.1. The
 sysmodule and Settings application must both come from the same release
 because the transport selector extends the SwitchCast IPC protocol.
 
 ### Upgrading from the 0.1.0 prototype
 
 The prototype occupied the SysDVR content directory
-`/atmosphere/contents/00FF0000A53BB665`. Version 0.4.0 does not overwrite or
+`/atmosphere/contents/00FF0000A53BB665`. Version 0.4.1 does not overwrite or
 remove that directory.
 
-Before testing 0.4.0, make sure the old prototype or SysDVR is not also
+Before testing 0.4.1, make sure the old prototype or SysDVR is not also
 streaming or enabled at boot. Two capture sysmodules can compete for memory and
 the capture service. If `00FF0000A53BB665` contains the old SwitchCast
 prototype, restore your SysDVR backup or remove that old prototype directory.
@@ -215,9 +236,10 @@ USB device ready; waiting for SwitchCast Dock
   -> Dock decoder and 1080p HDMI output
 ```
 
-The source in that path remains the Switch capture service's fixed 720p
-bitstream. Dock 0.1.15 scales it on the KMS display plane to a 1080p60 HDMI
-mode without software resizing or re-encoding.
+The video source in that path remains the Switch capture service's fixed 720p
+bitstream. Dock 0.1.16 scales it on the KMS display plane to a 1080p60 HDMI
+mode without software resizing or re-encoding, while stereo PCM travels in
+separate protocol packets.
 
 ## Limitations
 

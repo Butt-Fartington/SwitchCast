@@ -29,12 +29,21 @@ int main(void)
 		SwitchCastUsbParseRequest(request, sizeof(request), &parsed) ==
 		SwitchCastUsbHandshake_Ok);
 	assert(parsed.injectSpsPps);
+	assert(!parsed.audioEnabled);
+	assert(!parsed.keepaliveEnabled);
 
 	request[6] |= 1U << 1;
 	assert(
 		SwitchCastUsbParseRequest(request, sizeof(request), &parsed) ==
-		SwitchCastUsbHandshake_InvalidChannel);
+		SwitchCastUsbHandshake_Ok);
+	assert(parsed.audioEnabled);
+	request[9] |= 1U << 2;
+	assert(
+		SwitchCastUsbParseRequest(request, sizeof(request), &parsed) ==
+		SwitchCastUsbHandshake_Ok);
+	assert(parsed.keepaliveEnabled);
 	request[6] = 1U << 0;
+	request[9] = 0;
 
 	request[4] = '0';
 	request[5] = '2';

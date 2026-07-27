@@ -3,7 +3,7 @@
 Install devkitPro with devkitA64, libnx, and the Switch portlibs needed by the
 Settings app: curl, zlib, GLFW, EGL, and their graphics dependencies.
 
-The official 0.4.0 release uses:
+The official 0.4.1 release uses:
 
 ```text
 devkitA64 / GCC 16.1.0
@@ -80,4 +80,4 @@ switch/SwitchCast.nro
 
 `ReleaseSysmodule.sh` performs a clean two-binary build, runs the host checks,
 assembles the SD-card layout, includes all attribution and license documents,
-and writes `build-release/SwitchCast-Standalone-v0.4.0.zip`.
+and writes `build-release/SwitchCast-Standalone-v0.4.1.zip`.

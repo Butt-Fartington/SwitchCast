@@ -91,6 +91,8 @@ extern VideoPacket VPkt;
 extern AudioPacket APkt;
 
 Result CaptureInitialize();
+Result CaptureInitializeAudio();
+void CaptureFinalizeAudio();
 void CaptureFinalize();
 
 // Captures video with grc:d, if no game is running this blocks and there's no way to terminate the call

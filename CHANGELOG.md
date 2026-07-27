@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.1 — 2026-07-26
+
+- Added independent USB keepalive and gameplay-freshness supervision.
+- Restored the Switch panel within 1.5 seconds when USB gameplay video stops,
+  even if the blocking capture call has not returned.
+- Added SysDVR-compatible 48 kHz stereo PCM in USB Dock mode with a dedicated
+  capture thread and serialized endpoint writes.
+- Kept Cast mode video-only and kept inactive USB audio resources out of the
+  Cast transport.
+- Added session generations so a result captured for a dead USB session is
+  never written into a replacement session.
+- Paired with SwitchCast Dock 0.1.16 for HDMI audio, graphical status, idle
+  video teardown/resume, and reconnect hardening.
+
 ## 0.4.0 — 2026-07-26
 
 - Added a standalone, video-only USB Dock transport compatible with SysDVR

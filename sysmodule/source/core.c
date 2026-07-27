@@ -13,6 +13,7 @@ StaticBuffers Buffers;
 atomic_bool IsThreadRunning = false;
 
 static Thread VideoThread;
+static Thread AudioThread;
 static Mutex StateMutex;
 static bool StateMutexReady;
 static atomic_uint SelectedTransport = TYPE_MODE_CAST;
@@ -129,6 +130,18 @@ void CoreStart(void)
 			sizeof(VideoStack),
 			0x2C);
 	}
+	if (ActiveMode->AThread) {
+		static u8 alignas(0x1000)
+			AudioStack[0x2000 + LOGGING_STACK_BOOST];
+		memset(AudioStack, 0, sizeof(AudioStack));
+		LaunchThread(
+			&AudioThread,
+			ActiveMode->AThread,
+			ActiveMode->Aargs,
+			AudioStack,
+			sizeof(AudioStack),
+			0x2C);
+	}
 	mutexUnlock(&StateMutex);
 }
 
@@ -145,6 +158,8 @@ void CoreStop(void)
 		ActiveMode->ExitFn();
 	if (ActiveMode && ActiveMode->VThread)
 		JoinThread(&VideoThread);
+	if (ActiveMode && ActiveMode->AThread)
+		JoinThread(&AudioThread);
 	ActiveMode = NULL;
 	mutexUnlock(&StateMutex);
 }

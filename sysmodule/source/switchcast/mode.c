@@ -91,5 +91,7 @@ const StreamMode CAST_MODE = {
 	InitializeMode,
 	ExitMode,
 	StreamVideo,
+	NULL,
+	NULL,
 	NULL
 };

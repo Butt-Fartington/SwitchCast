@@ -28,6 +28,8 @@ typedef enum {
 
 typedef struct {
 	bool injectSpsPps;
+	bool audioEnabled;
+	bool keepaliveEnabled;
 } SwitchCastUsbRequest;
 
 SwitchCastUsbHandshakeResult SwitchCastUsbParseRequest(
