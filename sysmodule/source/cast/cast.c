@@ -203,7 +203,7 @@ void Cast_SetSettingsVisible(bool visible)
 	atomic_store(&SettingsVisible, visible);
 }
 
-static void UpdateConsoleScreenBlanking(bool videoActive)
+void Cast_UpdateConsoleScreenBlanking(bool videoActive)
 {
 	const bool shouldBlank =
 		videoActive &&
@@ -244,7 +244,7 @@ static void RestoreConsoleScreen(void)
 		unsigned int attempt = 0;
 		attempt < 3 && ScreenBlankingApplied;
 		++attempt) {
-		UpdateConsoleScreenBlanking(false);
+		Cast_UpdateConsoleScreenBlanking(false);
 		if (ScreenBlankingApplied)
 			svcSleepThread(20E+6);
 	}
@@ -1635,7 +1635,7 @@ static StreamSessionResult RunStreamSession(void)
 		// Only blank after the first gameplay frame is transmitted. If capture stops
 		// producing frames (for example, after HOME or a title transition),
 		// restore the console within the gameplay freshness window.
-		UpdateConsoleScreenBlanking(
+		Cast_UpdateConsoleScreenBlanking(
 			sentFirstFrame && HasRecentGameplay());
 
 		const u64 now = armGetSystemTick();

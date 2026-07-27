@@ -4,6 +4,7 @@
 #include "../cast/cast.h"
 #include "../core.h"
 #include "../modes/defines.h"
+#include "../dock/usb_mode.h"
 
 static Handle Handles[2];
 static SmServiceName ServerName;
@@ -158,7 +159,10 @@ static bool HandleCommand(const Request* request)
 		return false;
 	}
 	case CMD_GET_CAST_STATUS: {
-		const u32 status = Cast_GetStatus();
+		const u32 status =
+			CoreGetTransport() == TYPE_MODE_USB_DOCK
+				? UsbModeGetStatus()
+				: Cast_GetStatus();
 		WritePayloadResponseToTls(
 			0,
 			&status,
@@ -166,7 +170,10 @@ static bool HandleCommand(const Request* request)
 		return false;
 	}
 	case CMD_GET_CAST_TARGET_DELAY: {
-		const u32 delay = Cast_GetTargetDelayMs();
+		const u32 delay =
+			CoreGetTransport() == TYPE_MODE_USB_DOCK
+				? 0
+				: Cast_GetTargetDelayMs();
 		WritePayloadResponseToTls(
 			0,
 			&delay,
@@ -174,7 +181,10 @@ static bool HandleCommand(const Request* request)
 		return false;
 	}
 	case CMD_GET_CAST_RECEIVER_DELAY: {
-		const u32 delay = Cast_GetReceiverDelayMs();
+		const u32 delay =
+			CoreGetTransport() == TYPE_MODE_USB_DOCK
+				? 0
+				: Cast_GetReceiverDelayMs();
 		WritePayloadResponseToTls(
 			0,
 			&delay,
@@ -188,6 +198,14 @@ static bool HandleCommand(const Request* request)
 			0,
 			&enabled,
 			sizeof(enabled));
+		return false;
+	}
+	case CMD_GET_TRANSPORT: {
+		const u32 transport = CoreGetTransport();
+		WritePayloadResponseToTls(
+			0,
+			&transport,
+			sizeof(transport));
 		return false;
 	}
 	case CMD_ENABLE:
@@ -209,6 +227,22 @@ static bool HandleCommand(const Request* request)
 		memcpy(&enabled, request->data, sizeof(enabled));
 		Cast_SetBlankScreenEnabled(enabled != 0);
 		WriteResponseToTls(0);
+		return false;
+	}
+	case CMD_SET_TRANSPORT: {
+		if (
+			!request->data ||
+			request->dataSize < sizeof(u32)) {
+			WriteResponseToTls(ERR_IPC_INVSIZE);
+			return false;
+		}
+		u32 transport;
+		memcpy(
+			&transport,
+			request->data,
+			sizeof(transport));
+		WriteResponseToTls(
+			CoreSetTransport(transport));
 		return false;
 	}
 	case CMD_DEBUG_CRASH:

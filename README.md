@@ -1,16 +1,21 @@
-# SwitchCast 0.3.2
+# SwitchCast 0.4.0
 
 ![SwitchCast controller-and-video mark](work/assets/switchcast-controller-mark.png)
 
 **Free and open-source software — GNU GPL version 2.**
 
 SwitchCast sends the Nintendo Switch's captured H.264 gameplay video directly
-to a Chromecast or Google Cast TV on the local network.
+to either a Chromecast/Google Cast TV over Wi-Fi or a SwitchCast Dock over
+USB.
 
-It uses the receiver's built-in Cast Streaming application (`0F5096E8`),
+Cast mode uses the receiver's built-in Cast Streaming application (`0F5096E8`),
 negotiates over Cast V2 TLS, and sends encrypted Cast RTP/RTCP over UDP. There
 is no PC, phone, relay, hosted page, HLS server, custom Web Receiver, or Cast
 Developer Console registration in the path.
+
+USB Dock mode sends the same native capture through the SysDVR-compatible
+protocol-03 bulk format to a Raspberry Pi Zero 2 W receiver. It bypasses Wi-Fi,
+Cast negotiation, and receiver buffering for the lowest-latency path.
 
 ## Built on SysDVR
 
@@ -20,9 +25,10 @@ tree and inherits or adapts its Switch capture implementation, memory-conscious
 sysmodule architecture, build and process-management foundations, Settings UI,
 and dvr-patches integration.
 
-SwitchCast adds the Google Cast transport and standalone identity. “Standalone”
-means SysDVR does not have to be installed at runtime; it does not diminish the
-project's lineage or the importance of the upstream work.
+SwitchCast adds the Google Cast transport, the dedicated Dock receiver, and a
+standalone identity. “Standalone” means SysDVR does not have to be installed
+at runtime; it does not diminish the project's lineage or the importance of
+the upstream work.
 
 Read `SYSDVR-ATTRIBUTION.md` for the detailed credit and visit the original
 project at **https://github.com/exelix11/SysDVR**.
@@ -31,6 +37,26 @@ This repository is maintained as a fork of SysDVR so GitHub also preserves
 the upstream commit history and displays the relationship on every repository
 page. The SwitchCast work is based on SysDVR snapshot
 [`804fd36`](https://github.com/exelix11/SysDVR/commit/804fd36e54983b7c76b249059b159f896af35b4d).
+
+## New in 0.4.0
+
+- Added a native, video-only **USB Dock** transport to the standalone
+  SwitchCast sysmodule.
+- Added a mutually exclusive **Cast over Wi-Fi / USB Dock** selector to the
+  SwitchCast Settings dashboard.
+- Retained SysDVR protocol-03 packet compatibility and prominent upstream
+  attribution.
+- Put the Cast working buffers and two USB endpoint pages in a union so the
+  inactive transport consumes no parallel buffer allocation.
+- Kept the socket subsystem offline in USB mode.
+- Preserved screen blanking's safety rules in both transports: Settings stays
+  visible, blanking begins only after gameplay video, and the panel restores
+  on stop or disconnect.
+- Added live USB initialization, dock-waiting, game-waiting, streaming, I/O,
+  and capture status through IPC.
+- Paired this release with SwitchCast Dock 0.1.15, whose HDMI link is 1080p60
+  while the Switch's native continuous capture remains 1280x720 at about
+  30 fps.
 
 ## New in 0.3.2
 
@@ -77,19 +103,20 @@ SwitchCast has its own:
 - Atmosphère content ID: `00FF000053434153`
 - IPC service: `swcast`
 - configuration directory: `/config/switchcast`
-- Cast-only runtime and Settings UI
+- mutually exclusive Cast and USB Dock runtime and Settings UI
 
-The installed binaries do not require, launch, replace, or communicate with
-SysDVR. The sysmodule compiles only Switch capture, Cast transport, discovery,
-and its small IPC controller; the USB, TCP, RTSP, audio, and legacy mode
-manager are not linked.
+The installed binaries do not require, launch, replace, or communicate with a
+separate SysDVR installation. The sysmodule compiles Switch capture, Cast and
+USB Dock transports, and its small IPC controller; TCP, RTSP, audio, and the
+legacy mode manager are not linked.
 
 ## What is included
 
-- `SwitchCast.nro`: receiver picker, enable/disable control, live status, boot
-  preference, and dvr-patches manager.
+- `SwitchCast.nro`: transport selector, receiver picker, enable/disable
+  control, live status, boot preference, and dvr-patches manager.
 - A dedicated Atmosphère sysmodule that remains alive while a game runs.
 - Native OFFER/ANSWER negotiation for 1280x720 H.264 video.
+- Direct SysDVR-compatible USB protocol-03 H.264 output for SwitchCast Dock.
 - AES-128-CTR frame encryption using the Switch's hardware AES implementation.
 - Cast RTP packetization, RTCP feedback, retransmission, and keyframe recovery.
 - A variable-size, up-to-24-frame history in a 2 MiB game-only arena with no
@@ -106,10 +133,11 @@ because an ordinary homebrew app cannot stay active beside a retail game.
 
 ## Install
 
-1. Extract `SwitchCast-Standalone-v0.3.2.zip` to the SD-card root.
+1. Extract `SwitchCast-Standalone-v0.4.0.zip` to the SD-card root.
 2. Reboot the console.
 3. Open `/switch/SwitchCast.nro` from the Homebrew Menu.
-4. Select **SwitchCast**, then choose a receiver from the discovered list.
+4. Choose **Cast over Wi-Fi** and a receiver, or choose **USB Dock** and start
+   the USB transport.
 5. Optionally choose **Set current mode as default on boot**.
 6. Exit the Settings app and launch a capture-compatible game.
 
@@ -126,17 +154,17 @@ command. Contributions are welcome under the requirements in
 
 ### Upgrading
 
-Version 0.3.2 can be copied directly over 0.3.1, 0.3.0, or 0.2.1. The sysmodule and
-Settings application must both come from the same release because screen
-blanking and live latency metrics extend the SwitchCast IPC protocol.
+Version 0.4.0 can be copied directly over 0.3.2, 0.3.1, 0.3.0, or 0.2.1. The
+sysmodule and Settings application must both come from the same release
+because the transport selector extends the SwitchCast IPC protocol.
 
 ### Upgrading from the 0.1.0 prototype
 
 The prototype occupied the SysDVR content directory
-`/atmosphere/contents/00FF0000A53BB665`. Version 0.3.2 does not overwrite or
+`/atmosphere/contents/00FF0000A53BB665`. Version 0.4.0 does not overwrite or
 remove that directory.
 
-Before testing 0.3.2, make sure the old prototype or SysDVR is not also
+Before testing 0.4.0, make sure the old prototype or SysDVR is not also
 streaming or enabled at boot. Two capture sysmodules can compete for memory and
 the capture service. If `00FF0000A53BB665` contains the old SwitchCast
 prototype, restore your SysDVR backup or remove that old prototype directory.
@@ -157,6 +185,7 @@ prototype, restore your SysDVR backup or remove that old prototype directory.
 /config/switchcast/receiver_ip      selected receiver IPv4 address
 /config/switchcast/latency_profile  `ultra` (90 ms) or `stable` (150 ms)
 /config/switchcast/blank_screen     blank the console backlight during video
+/config/switchcast/transport        `cast` or `usb`
 /config/switchcast/debug.json       live transport and recovery statistics
 /config/switchcast/last-failure.json preserved final stream failure/recovery
 /config/switchcast/error.json       rejected Cast response, when available
@@ -177,10 +206,26 @@ When a game exits, the receiver, TLS/UDP sockets, queue, and temporary heap are
 released. SwitchCast returns to **Armed; waiting for a capture-compatible
 game**, ready for the next title without a reboot.
 
+USB Dock mode follows the shorter path:
+
+```text
+USB device ready; waiting for SwitchCast Dock
+  -> Dock connected; waiting for a capture-compatible game
+  -> Native H.264 gameplay packets over USB 2.0
+  -> Dock decoder and 1080p HDMI output
+```
+
+The source in that path remains the Switch capture service's fixed 720p
+bitstream. Dock 0.1.15 scales it on the KMS display plane to a 1080p60 HDMI
+mode without software resizing or re-encoding.
+
 ## Limitations
 
 - Horizon's capture service supplies fixed 1280x720, approximately 30 fps
   H.264 and captures games, not the HOME menu.
+- The Dock's 1080p HDMI mode improves output compatibility and chooses the
+  Pi's display-plane scaler; it cannot restore detail absent from the 720p
+  source.
 - Games that opt out of capture require compatible dvr-patches. Those patches
   can introduce title-specific problems.
 - Receiver firmware and TV processing differ. Some models may reject the

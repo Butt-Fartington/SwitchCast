@@ -4,7 +4,6 @@
 
 #include "capture.h"
 #include "modes/modes.h"
-#include "net/sockets.h"
 
 static const char BuildIdentity[] =
 	"SWITCHCAST_BUILD/" SWITCHCAST_VERSION_STRING "\n"
@@ -16,6 +15,8 @@ atomic_bool IsThreadRunning = false;
 static Thread VideoThread;
 static Mutex StateMutex;
 static bool StateMutexReady;
+static atomic_uint SelectedTransport = TYPE_MODE_CAST;
+static const StreamMode* ActiveMode;
 
 Result CoreInit(void)
 {
@@ -27,8 +28,6 @@ Result CoreInit(void)
 	Result rc = CaptureInitialize();
 	if (R_FAILED(rc))
 		return rc;
-
-	SocketInit();
 
 	// Keep the build identity and primary attribution easy to scan in both
 	// the binary and static memory.
@@ -80,6 +79,28 @@ bool CoreIsEnabled(void)
 	return atomic_load(&IsThreadRunning);
 }
 
+u32 CoreGetTransport(void)
+{
+	return atomic_load(&SelectedTransport);
+}
+
+Result CoreSetTransport(u32 transport)
+{
+	if (
+		transport != TYPE_MODE_CAST &&
+		transport != TYPE_MODE_USB_DOCK)
+		return ERR_SWITCHCAST_TRANSPORT;
+
+	mutexLock(&StateMutex);
+	if (atomic_load(&IsThreadRunning)) {
+		mutexUnlock(&StateMutex);
+		return ERR_SWITCHCAST_TRANSPORT;
+	}
+	atomic_store(&SelectedTransport, transport);
+	mutexUnlock(&StateMutex);
+	return 0;
+}
+
 void CoreStart(void)
 {
 	mutexLock(&StateMutex);
@@ -89,17 +110,21 @@ void CoreStart(void)
 	}
 
 	memset(&Buffers, 0, sizeof(Buffers));
+	ActiveMode =
+		atomic_load(&SelectedTransport) == TYPE_MODE_USB_DOCK
+			? &USB_MODE
+			: &CAST_MODE;
 	atomic_store(&IsThreadRunning, true);
-	if (CAST_MODE.InitFn)
-		CAST_MODE.InitFn();
-	if (CAST_MODE.VThread) {
+	if (ActiveMode->InitFn)
+		ActiveMode->InitFn();
+	if (ActiveMode->VThread) {
 		static u8 alignas(0x1000)
 			VideoStack[0x2000 + LOGGING_STACK_BOOST];
 		memset(VideoStack, 0, sizeof(VideoStack));
 		LaunchThread(
 			&VideoThread,
-			CAST_MODE.VThread,
-			CAST_MODE.Vargs,
+			ActiveMode->VThread,
+			ActiveMode->Vargs,
 			VideoStack,
 			sizeof(VideoStack),
 			0x2C);
@@ -116,9 +141,10 @@ void CoreStop(void)
 	}
 
 	atomic_store(&IsThreadRunning, false);
-	if (CAST_MODE.ExitFn)
-		CAST_MODE.ExitFn();
-	if (CAST_MODE.VThread)
+	if (ActiveMode && ActiveMode->ExitFn)
+		ActiveMode->ExitFn();
+	if (ActiveMode && ActiveMode->VThread)
 		JoinThread(&VideoThread);
+	ActiveMode = NULL;
 	mutexUnlock(&StateMutex);
 }

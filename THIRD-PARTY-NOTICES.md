@@ -1,6 +1,6 @@
 # Third-party notices
 
-This file inventories code and data distributed in SwitchCast 0.3.2. It
+This file inventories code and data distributed in SwitchCast 0.4.0. It
 distinguishes material inherited through SysDVR, components vendored in the
 source tree, libraries statically linked by the release toolchain, and
 reference-only projects.
@@ -17,12 +17,13 @@ combined derivative source is licensed under GPL-2.0; see `LICENSE`.
 - License: GNU General Public License version 2
 - SwitchCast base snapshot:
   [`804fd36e54983b7c76b249059b159f896af35b4d`](https://github.com/exelix11/SysDVR/commit/804fd36e54983b7c76b249059b159f896af35b4d)
-- Use: substantial inherited and modified capture, sysmodule, IPC, Settings UI,
-  translation, packaging, and dvr-patches-management code
+- Use: substantial inherited and modified capture, USB protocol/transport,
+  sysmodule, IPC, Settings UI, translation, packaging, and
+  dvr-patches-management code
 
 SysDVR is the primary foundation of SwitchCast. See
 `SYSDVR-ATTRIBUTION.md` for the detailed lineage and division between the
-upstream base and SwitchCast's Cast-specific work.
+upstream base and SwitchCast's Cast/Dock-specific work.
 
 ## Vendored source and data
 
@@ -218,7 +219,7 @@ PERFORMANCE OF THIS SOFTWARE.
 
 ## Statically linked release dependencies
 
-The official 0.3.2 binaries were built with the following devkitPro packages.
+The official 0.4.0 binaries were built with the following devkitPro packages.
 Their source is not vendored in this repository, but portions are linked into
 the executable as shown by the release link map.
 

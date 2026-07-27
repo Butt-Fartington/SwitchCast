@@ -16,6 +16,8 @@ constexpr auto LatencyProfilePath =
 	SDMC "/config/switchcast/latency_profile";
 constexpr auto BlankScreenPath =
 	SDMC "/config/switchcast/blank_screen";
+constexpr auto TransportPath =
+	SDMC "/config/switchcast/transport";
 
 constexpr u32 UltraTargetDelayMs = 90;
 constexpr u32 StableTargetDelayMs = 150;
@@ -27,6 +29,7 @@ bool UltraLatency;
 bool BlankScreen;
 bool RestartAfterProfileChange;
 u32 CurrentStatus = CAST_STATUS_OFF;
+u32 CurrentTransport = TYPE_MODE_CAST;
 u32 TargetDelayMs = UltraTargetDelayMs;
 u32 ReceiverDelayMs;
 std::string ConfiguredReceiver;
@@ -103,6 +106,22 @@ std::string CastStatusText(u32 status)
 		return Strings::Main.CastStatusReceiverReadyTimeout;
 	case CAST_STATUS_RECEIVER_STREAM_ERROR:
 		return Strings::Main.CastStatusReceiverStreamError;
+	case USB_STATUS_INITIALIZING:
+		return "USB Dock is initializing";
+	case USB_STATUS_WAITING_DOCK:
+		return "Waiting for SwitchCast Dock USB host";
+	case USB_STATUS_WAITING_GAME:
+		return "Dock connected; waiting for gameplay video";
+	case USB_STATUS_STREAMING:
+		return "USB Dock gameplay video is streaming";
+	case USB_STATUS_INIT_ERROR:
+		return "USB device initialization failed";
+	case USB_STATUS_IO_ERROR:
+		return "USB Dock connection was interrupted";
+	case USB_STATUS_CAPTURE_ERROR:
+		return "Gameplay capture stopped";
+	case USB_STATUS_OFF:
+		return "USB Dock is stopped";
 	case CAST_STATUS_OFF:
 	default:
 		return Strings::Main.CastStatusOff;
@@ -177,6 +196,24 @@ bool SaveBlankScreen(bool enabled)
 	}
 }
 
+bool SaveTransport(u32 transport)
+{
+	try {
+		const std::string value =
+			transport == TYPE_MODE_USB_DOCK ? "usb" : "cast";
+		fs::CreateDir(SDMC "/config/");
+		fs::CreateDir(SDMC "/config/switchcast/");
+		fs::Delete(TransportPath);
+		fs::WriteFile(
+			TransportPath,
+			{value.begin(), value.end()});
+		return true;
+	}
+	catch (std::exception&) {
+		return false;
+	}
+}
+
 bool SetEnabled(bool enabled)
 {
 	const Result rc = SwitchCastSetEnabled(enabled);
@@ -192,6 +229,10 @@ bool SetEnabled(bool enabled)
 
 void RefreshRuntimeState(void)
 {
+	u32 transport = TYPE_MODE_CAST;
+	if (R_SUCCEEDED(SwitchCastGetTransport(&transport)))
+		CurrentTransport = transport;
+
 	u32 enabled = 0;
 	if (R_SUCCEEDED(SwitchCastGetEnabled(&enabled)))
 		CurrentEnabled = enabled != 0;
@@ -200,13 +241,59 @@ void RefreshRuntimeState(void)
 		(void)SwitchCastGetReceiverDelay(&ReceiverDelayMs);
 	}
 	else {
-		CurrentStatus = CAST_STATUS_OFF;
+		CurrentStatus =
+			CurrentTransport == TYPE_MODE_USB_DOCK
+				? USB_STATUS_OFF
+				: CAST_STATUS_OFF;
 		ReceiverDelayMs = 0;
 	}
 	(void)SwitchCastGetTargetDelay(&TargetDelayMs);
 	u32 blankScreen = 0;
 	if (R_SUCCEEDED(SwitchCastGetBlankScreen(&blankScreen)))
 		BlankScreen = blankScreen != 0;
+}
+
+void SelectTransport(u32 transport)
+{
+	if (
+		transport == CurrentTransport ||
+		(transport != TYPE_MODE_CAST &&
+		 transport != TYPE_MODE_USB_DOCK))
+		return;
+
+	const u32 previousTransport = CurrentTransport;
+	const bool restart = CurrentEnabled;
+	if (restart && !SetEnabled(false))
+		return;
+
+	const Result rc = SwitchCastSetTransport(transport);
+	if (R_FAILED(rc)) {
+		if (restart)
+			(void)SetEnabled(true);
+		app::FatalErrorWithErrorCode(
+			"Couldn't change the video transport.",
+			rc);
+		return;
+	}
+
+	if (!SaveTransport(transport)) {
+		(void)SwitchCastSetTransport(previousTransport);
+		if (restart)
+			(void)SetEnabled(true);
+		app::FatalError(
+			"Couldn't save the video transport.",
+			Strings::Error.TroubleshootBootMode);
+		return;
+	}
+
+	CurrentTransport = transport;
+	CurrentStatus =
+		transport == TYPE_MODE_USB_DOCK
+			? USB_STATUS_OFF
+			: CAST_STATUS_OFF;
+	ReceiverDelayMs = 0;
+	if (restart)
+		(void)SetEnabled(true);
 }
 
 void PumpProfileRestart(void)
@@ -275,38 +362,54 @@ void StatusBadge(
 
 void DrawDashboard(void)
 {
-	ImGui::SetCursorPos({70, 174});
+	const bool usbDock =
+		CurrentTransport == TYPE_MODE_USB_DOCK;
+	ImGui::SetCursorPos({70, 166});
 	ImGui::BeginChild(
 		"SwitchCastStatus",
-		{1140, 198},
+		{1140, 180},
 		true,
 		ImGuiWindowFlags_NoScrollbar |
 			ImGuiWindowFlags_NoScrollWithMouse);
 
-	ImGui::SetCursorPos({20, 38});
+	ImGui::SetCursorPos({20, 28});
 	ImGui::Image(CastImage, CastImage.Size());
 
-	ImGui::SetCursorPos({235, 18});
+	ImGui::SetCursorPos({235, 12});
 	UI::BigFont();
-	ImGui::TextUnformatted("Gameplay Cast");
+	ImGui::TextUnformatted(
+		usbDock ? "USB Dock" : "Gameplay Cast");
 	UI::PopFont();
 
-	ImGui::SetCursorPos({235, 82});
+	ImGui::SetCursorPos({235, 66});
 	ImGui::Text(
 		"Status: %s",
-		(CurrentEnabled
-			? CastStatusText(CurrentStatus)
-			: Strings::Main.CastStatusOff).c_str());
+		CastStatusText(
+			CurrentEnabled
+				? CurrentStatus
+				: usbDock
+					? USB_STATUS_OFF
+					: CAST_STATUS_OFF).c_str());
 
-	const std::string receiver =
-		ConfiguredReceiver.empty()
-			? Strings::Main.CastPickerAutomatic
-			: ConfiguredReceiver;
-	ImGui::SetCursorPos({235, 118});
-	ImGui::Text("Receiver: %s", receiver.c_str());
+	ImGui::SetCursorPos({235, 102});
+	if (usbDock) {
+		ImGui::TextUnformatted(
+			"Transport: direct USB 2.0 to SwitchCast Dock");
+	}
+	else {
+		const std::string receiver =
+			ConfiguredReceiver.empty()
+				? Strings::Main.CastPickerAutomatic
+				: ConfiguredReceiver;
+		ImGui::Text("Receiver: %s", receiver.c_str());
+	}
 
-	ImGui::SetCursorPos({235, 154});
-	if (ReceiverDelayMs) {
+	ImGui::SetCursorPos({235, 138});
+	if (usbDock) {
+		ImGui::TextUnformatted(
+			"Source: native 1280x720 @ ~30 fps  |  Dock HDMI: 1920x1080");
+	}
+	else if (ReceiverDelayMs) {
 		ImGui::Text(
 			"Video delay target: %u ms  |  Receiver report: %u ms",
 			TargetDelayMs,
@@ -318,19 +421,19 @@ void DrawDashboard(void)
 			TargetDelayMs);
 	}
 
-	ImGui::SetCursorPos({965, 30});
+	ImGui::SetCursorPos({965, 20});
 	StatusBadge(
 		CurrentEnabled ? "[ON] ENABLED" : "[OFF] STOPPED",
 		CurrentEnabled
 			? ImVec4(0.15f, 1.0f, 0.55f, 1.0f)
 			: ImVec4(0.65f, 0.65f, 0.70f, 1.0f));
-	ImGui::SetCursorPos({965, 68});
+	ImGui::SetCursorPos({965, 58});
 	StatusBadge(
 		BootEnabled ? "[ON] ON AT BOOT" : "[OFF] MANUAL START",
 		BootEnabled
 			? ImVec4(0.15f, 0.75f, 1.0f, 1.0f)
 			: ImVec4(0.65f, 0.65f, 0.70f, 1.0f));
-	ImGui::SetCursorPos({965, 106});
+	ImGui::SetCursorPos({965, 96});
 	StatusBadge(
 		BlankScreen ? "[ON] BLANK DISPLAY" : "[OFF] SCREEN ON",
 		BlankScreen
@@ -393,6 +496,9 @@ void scenes::RefreshModeSelect(void)
 	}
 
 	CurrentEnabled = enabled != 0;
+	u32 transport = TYPE_MODE_CAST;
+	if (R_SUCCEEDED(SwitchCastGetTransport(&transport)))
+		CurrentTransport = transport;
 	BootEnabled = fs::Exists(BootEnabledPath);
 	ConfiguredReceiver = ReadTrimmedFile(ReceiverPath);
 	UltraLatency =
@@ -408,7 +514,9 @@ void scenes::RefreshModeSelect(void)
 
 void scenes::SetModeSelectState(uint32_t mode)
 {
-	CurrentEnabled = mode == TYPE_MODE_CAST;
+	CurrentEnabled =
+		mode != TYPE_MODE_INVALID &&
+		mode != TYPE_MODE_NULL;
 }
 
 void scenes::ModeSelect(void)
@@ -425,55 +533,94 @@ void scenes::ModeSelect(void)
 	CenterText("SwitchCast");
 	UI::PopFont();
 	ImGui::SetCursorPosY(137);
-	CenterText("Direct, video-only gameplay casting on your local network");
+	CenterText("Direct, video-only gameplay over Cast or USB Dock");
 
 	DrawDashboard();
 
-	ImGui::SetCursorPos({70, 386});
+	const bool usbDock =
+		CurrentTransport == TYPE_MODE_USB_DOCK;
+	ImGui::SetCursorPos({70, 356});
 	if (ImGui::Button(
-		CurrentEnabled
-			? "Change Cast receiver"
-			: "Select receiver & start",
-		{555, 52}))
-		OpenCastPicker();
+		usbDock
+			? "Cast over Wi-Fi##transport-cast"
+			: "[Selected] Cast over Wi-Fi##transport-cast",
+		{555, 48}))
+		SelectTransport(TYPE_MODE_CAST);
 	ImGui::SameLine();
 	if (ImGui::Button(
-		CurrentEnabled
-			? "Stop SwitchCast"
-			: "Start with saved receiver",
-		{555, 52})) {
-		if (!SetEnabled(!CurrentEnabled)) {
+		usbDock
+			? "[Selected] USB Dock##transport-usb"
+			: "USB Dock##transport-usb",
+		{555, 48}))
+		SelectTransport(TYPE_MODE_USB_DOCK);
+
+	ImGui::SetCursorPos({70, 416});
+	if (usbDock) {
+		if (ImGui::Button(
+			CurrentEnabled
+				? "Stop USB Dock streaming"
+				: "Start USB Dock streaming",
+			{1140, 52}) &&
+			!SetEnabled(!CurrentEnabled)) {
+			ImGui::End();
+			return;
+		}
+	}
+	else {
+		if (ImGui::Button(
+			CurrentEnabled
+				? "Change Cast receiver"
+				: "Select receiver & start",
+			{555, 52}))
+			OpenCastPicker();
+		ImGui::SameLine();
+		if (ImGui::Button(
+			CurrentEnabled
+				? "Stop SwitchCast"
+				: "Start with saved receiver",
+			{555, 52}) &&
+			!SetEnabled(!CurrentEnabled)) {
 			ImGui::End();
 			return;
 		}
 	}
 
-	ImGui::SetCursorPos({70, 458});
-	ImGui::TextUnformatted("Video latency profile");
-	ImGui::SetCursorPos({360, 450});
-	if (ImGui::Button(
-		UltraLatency
-			? "[Selected] Ultra-low - 90 ms##ultra"
-			: "Ultra-low - 90 ms##ultra",
-		{350, 48}))
-		SelectLatencyProfile(true);
-	ImGui::SameLine();
-	if (ImGui::Button(
-		!UltraLatency
-			? "[Selected] Stable - 150 ms##stable"
-			: "Stable - 150 ms##stable",
-		{350, 48}))
-		SelectLatencyProfile(false);
+	if (usbDock) {
+		ImGui::SetCursorPosY(487);
+		CenterText(
+			"USB is the lowest-latency path. The Dock scales the native 720p capture to a 1080p HDMI signal.");
+		ImGui::SetCursorPosY(522);
+		CenterText(
+			"Start USB Dock streaming, then connect the Switch to the Dock's USB host port.");
+	}
+	else {
+		ImGui::SetCursorPos({70, 488});
+		ImGui::TextUnformatted("Video latency profile");
+		ImGui::SetCursorPos({360, 480});
+		if (ImGui::Button(
+			UltraLatency
+				? "[Selected] Ultra-low - 90 ms##ultra"
+				: "Ultra-low - 90 ms##ultra",
+			{350, 44}))
+			SelectLatencyProfile(true);
+		ImGui::SameLine();
+		if (ImGui::Button(
+			!UltraLatency
+				? "[Selected] Stable - 150 ms##stable"
+				: "Stable - 150 ms##stable",
+			{350, 44}))
+			SelectLatencyProfile(false);
 
-	ImGui::SetCursorPosY(510);
-	CenterText(
-		RestartAfterProfileChange
-			? "Restarting the video session with the new latency profile..."
-			: UltraLatency
-				? "Ultra-low shortens receiver buffering and packet pacing; use Stable if Wi-Fi recovery suffers."
-				: "Stable retains the proven 0.2.1 receiver buffer and packet pacing.");
+		ImGui::SetCursorPosY(530);
+		CenterText(
+			RestartAfterProfileChange
+				? "Restarting the video session with the new latency profile..."
+				: UltraLatency
+					? "Ultra-low shortens receiver buffering; use Stable if Wi-Fi recovery suffers."
+					: "Stable retains the proven receiver buffer and packet pacing.");
+	}
 
-	ImGui::SetCursorPos({70, 548});
+	ImGui::SetCursorPos({70, 552});
 	if (ImGui::Button(
 		BlankScreen
 			? "[ON] Blank Switch screen while streaming"
@@ -482,7 +629,7 @@ void scenes::ModeSelect(void)
 		SelectBlankScreen(!BlankScreen);
 	ImGui::SameLine();
 	ImGui::TextUnformatted(
-		"Backlight only; restores when gameplay video stops.");
+		"Backlight only; Settings stays visible and gameplay restores it.");
 
 	ImGui::SetCursorPos({70, 606});
 	if (ImGui::Button(

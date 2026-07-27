@@ -14,6 +14,7 @@ uint32_t Cast_GetCaptureGeneration(void);
 bool Cast_GetBlankScreenEnabled(void);
 void Cast_SetBlankScreenEnabled(bool enabled);
 void Cast_SetSettingsVisible(bool visible);
+void Cast_UpdateConsoleScreenBlanking(bool videoActive);
 void Cast_NotifyVideoStopped(void);
 void Cast_ServerThread(void*);
 void Cast_StopServer(void);

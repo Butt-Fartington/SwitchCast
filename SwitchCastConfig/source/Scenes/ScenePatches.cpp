@@ -96,7 +96,7 @@ namespace {
 
 		curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
 		curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1);
-		curl_easy_setopt(curl, CURLOPT_USERAGENT, "SwitchCast/0.3.2");
+		curl_easy_setopt(curl, CURLOPT_USERAGENT, "SwitchCast/0.4.0");
 		
 		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, +[](void* contents, size_t size, size_t nmemb, void* userp) 
 			{

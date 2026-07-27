@@ -1,5 +1,9 @@
 # SwitchCast native streaming design
 
+SwitchCast 0.4.0 has two mutually exclusive video transports. The Cast design
+below remains unchanged. USB Dock mode bypasses the Cast session entirely and
+uses the separate path documented after it.
+
 ## Session flow
 
 ```text
@@ -112,6 +116,35 @@ Receiver CLOSE or control-channel loss during the same transition is classified
 as normal gameplay shutdown. It no longer parks the sender in a permanent
 failure state. Codec, launch, and transport failures also retry with bounded
 delays while gameplay remains active.
+
+## USB Dock transport
+
+USB Dock mode retains the SysDVR protocol-03 wire format so the standalone
+SwitchCast sysmodule can feed SwitchCast Dock without a second capture
+sysmodule:
+
+```text
+Switch grc:d capture (Annex-B H.264, 1280x720 @ ~30 fps)
+  -> protocol-03 hello and video-only handshake
+  -> one packed SysDVR PacketHeader + access unit per USB bulk write
+  -> Pi Zero 2 W parser/decoder
+  -> DRM/KMS display plane
+  -> 1920x1080p60 HDMI link
+```
+
+The transport requests and reinjects SPS/PPS on every IDR, disables SysDVR's
+NAL replay optimization on the reliable USB link, and opens no network
+sockets. Cast working memory and the two 4 KiB USB endpoint pages share a
+union, so the USB pages add no reservation on top of the larger Cast working
+buffer set.
+
+The Switch-side source resolution is fixed by Horizon's continuous game
+capture service. The Dock scales the decoded 1280x720 frame on the KMS display
+plane; it does not re-encode or claim a 1080p capture.
+
+Screen blanking uses the same guarded policy as Cast mode. It begins only after
+a gameplay packet is delivered, stays disabled while SwitchCast Settings is
+visible, and restores the panel on USB stop or disconnect.
 
 ## Diagnostics
 

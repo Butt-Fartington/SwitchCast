@@ -36,6 +36,8 @@ Result CoreInit(void);
 void CoreStart(void);
 void CoreStop(void);
 bool CoreIsEnabled(void);
+u32 CoreGetTransport(void);
+Result CoreSetTransport(u32 transport);
 
 void LaunchThread(
 	Thread* thread,

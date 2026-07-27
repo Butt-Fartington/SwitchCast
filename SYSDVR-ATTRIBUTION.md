@@ -19,6 +19,8 @@ Substantial foundations inherited or adapted from SysDVR include:
 - Nintendo Switch gameplay capture through Horizon's `grc:d` services.
 - Capture initialization, H.264 packet handling, SPS/PPS reinjection, and
   capture-compatibility behavior.
+- USB device identity, protocol-03 handshake, packed video framing, and the
+  direct USB transport design used by SwitchCast Dock mode.
 - The memory-conscious Atmosphère sysmodule architecture and static-buffer
   approach.
 - The original build, packaging, process-management, and IPC foundations.
@@ -27,20 +29,22 @@ Substantial foundations inherited or adapted from SysDVR include:
 - Years of practical investigation into Switch capture behavior and
   game-specific compatibility.
 
-SwitchCast adds and specializes the Google Cast side: receiver discovery,
-Cast V2 control, native Cast Streaming OFFER/ANSWER negotiation, encrypted
-RTP/RTCP video delivery, retransmission, latency tuning, Cast status reporting,
-and automatic Cast session recovery.
+SwitchCast adds and specializes the Google Cast side—receiver discovery, Cast
+V2 control, native Cast Streaming OFFER/ANSWER negotiation, encrypted RTP/RTCP
+video delivery, retransmission, latency tuning, status reporting, and automatic
+session recovery—and adds the dedicated Raspberry Pi SwitchCast Dock receiver.
 
 The standalone SwitchCast title ID and service mean SysDVR does not need to be
 installed at runtime. They do **not** erase the project's lineage. SwitchCast
 is a derivative work of SysDVR and remains distributed under the **GNU General
 Public License version 2**.
 
-Legacy SysDVR PC clients, USB/TCP modes, RTSP transport, and audio pipeline are
-not part of the standalone SwitchCast build or public source set. Excluding
-those unused subsystems keeps the published tree aligned with the binaries;
-it does not change the credit for the substantial SysDVR code that remains.
+Legacy SysDVR PC clients, TCP/RTSP transports, general-purpose USB mode, and
+audio pipeline are not part of the standalone SwitchCast build or public
+source set. SwitchCast 0.4.0 instead includes a minimal video-only USB Dock
+transport with the same protocol lineage. Excluding the other unused
+subsystems keeps the published tree aligned with the binaries; it does not
+change the credit for the substantial SysDVR code that remains.
 
 Third-party libraries and data that arrived through the SysDVR source tree are
 credited individually in `THIRD-PARTY-NOTICES.md`. Their original file-level

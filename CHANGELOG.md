@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.0 — 2026-07-26
+
+- Added a standalone, video-only USB Dock transport compatible with SysDVR
+  protocol 03.
+- Added a live Cast/USB selector and USB connection status to the Settings
+  dashboard.
+- Used a union for Cast buffers and the two statically allocated USB endpoint
+  pages, with no general sysmodule heap.
+- Avoided socket initialization when USB Dock is selected.
+- Preserved guarded screen blanking across both transports.
+- Added native USB protocol tests and SwitchCast Dock documentation.
+
 ## 0.3.2 — 2026-07-25
 
 - Replaced three fixed media slots with a variable-size, up-to-24-frame

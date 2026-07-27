@@ -214,6 +214,18 @@ Result SwitchCastGetBlankScreen(u32* enabled)
 	return rc;
 }
 
+Result SwitchCastGetTransport(u32* transport)
+{
+	u32 value;
+	const Result rc = serviceDispatchOut(
+		&SwitchCastService,
+		CMD_GET_TRANSPORT,
+		value);
+	if (R_SUCCEEDED(rc))
+		*transport = value;
+	return rc;
+}
+
 Result SwitchCastSetEnabled(bool enabled)
 {
 	return serviceDispatch(
@@ -228,6 +240,14 @@ Result SwitchCastSetBlankScreen(bool enabled)
 		&SwitchCastService,
 		CMD_SET_BLANK_SCREEN,
 		value);
+}
+
+Result SwitchCastSetTransport(u32 transport)
+{
+	return serviceDispatchIn(
+		&SwitchCastService,
+		CMD_SET_TRANSPORT,
+		transport);
 }
 
 #else
@@ -315,6 +335,12 @@ Result SwitchCastGetBlankScreen(u32* enabled)
 	return 0;
 }
 
+Result SwitchCastGetTransport(u32* transport)
+{
+	*transport = TYPE_MODE_CAST;
+	return 0;
+}
+
 Result SwitchCastSetEnabled(bool enabled)
 {
 	(void)enabled;
@@ -324,6 +350,12 @@ Result SwitchCastSetEnabled(bool enabled)
 Result SwitchCastSetBlankScreen(bool enabled)
 {
 	(void)enabled;
+	return 0;
+}
+
+Result SwitchCastSetTransport(u32 transport)
+{
+	(void)transport;
 	return 0;
 }
 

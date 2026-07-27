@@ -2,7 +2,7 @@
 set -eu
 
 PROJECT_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-VERSION=0.3.2
+VERSION=0.4.0
 
 if [ -z "${DEVKITPRO:-}" ]; then
 	echo "Set DEVKITPRO to a complete devkitPro installation." >&2
@@ -46,6 +46,12 @@ c++ -std=c++17 -Wall -Wextra -Werror -O2 \
 	"$PROJECT_ROOT/tests/test_cast_discovery.cpp" \
 	-o "$HOST_BUILD/test_cast_discovery"
 "$HOST_BUILD/test_cast_discovery"
+
+cc -std=c11 -Wall -Wextra -Werror -O2 \
+	"$PROJECT_ROOT/sysmodule/source/dock/usb_proto.c" \
+	"$PROJECT_ROOT/tests/test_usb_proto.c" \
+	-o "$HOST_BUILD/test_usb_proto"
+"$HOST_BUILD/test_usb_proto"
 
 RELEASE_ROOT="$PROJECT_ROOT/build-release/SwitchCast"
 rm -rf "$PROJECT_ROOT/build-release"

@@ -2,6 +2,7 @@
 
 #include "../capture.h"
 #include "../cast/cast.h"
+#include "../net/sockets.h"
 
 static Thread CastThread;
 
@@ -65,6 +66,7 @@ static void StreamVideo(void* unused)
 
 static void InitializeMode(void)
 {
+	SocketInit();
 	CaptureConfigResetDefault();
 	CaptureSetNalHashing(false, false);
 	CaptureSetPPSSPSInject(true);
@@ -82,6 +84,7 @@ static void ExitMode(void)
 {
 	Cast_StopServer();
 	JoinThread(&CastThread);
+	SocketDeinit();
 }
 
 const StreamMode CAST_MODE = {

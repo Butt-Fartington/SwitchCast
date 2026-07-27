@@ -9,10 +9,12 @@ developed with the work of the **SysDVR contributors**.
 SysDVR is the main base of SwitchCast. The project began by modifying the
 SysDVR source tree, and it retains or adapts substantial portions of SysDVR's
 Nintendo Switch capture implementation, sysmodule architecture, build and
-process-management foundations, Settings UI, and dvr-patches integration.
+process-management foundations, SysDVR-compatible USB protocol, Settings UI,
+and dvr-patches integration.
 
-SwitchCast's Cast transport and standalone runtime are additions to that
-foundation. A separate title ID does not change the origin of the code.
+SwitchCast's Cast transport, dedicated Pi Dock receiver, and standalone runtime
+are additions to that foundation. A separate title ID does not change the
+origin of the code.
 
 The combined project is distributed under the GNU General Public License
 version 2; see `LICENSE`. See `SYSDVR-ATTRIBUTION.md` for a fuller description

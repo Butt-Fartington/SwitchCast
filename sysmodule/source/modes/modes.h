@@ -17,7 +17,7 @@ typedef struct {
 	void* Vargs;
 } StreamMode;
 
-typedef struct {
+typedef union {
 	struct {
 		u8 alignas(0x1000)
 			ControlThreadStackArea[0x5000 + LOGGING_STACK_BOOST];
@@ -27,7 +27,11 @@ typedef struct {
 		u8 UdpTx[1472];
 		u8 UdpRx[2048];
 	} CastMode;
+	struct {
+		u8 alignas(0x1000) EndpointPages[2][0x1000];
+	} UsbMode;
 } StaticBuffers;
 
 extern StaticBuffers Buffers;
 extern const StreamMode CAST_MODE;
+extern const StreamMode USB_MODE;

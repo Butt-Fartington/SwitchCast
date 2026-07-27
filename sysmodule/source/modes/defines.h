@@ -2,8 +2,8 @@
 
 // SwitchCast owns its version, IPC protocol, Atmosphere content ID, and
 // configuration namespace. It does not register or depend on SysDVR.
-#define SWITCHCAST_VERSION_STRING "0.3.2"
-#define SWITCHCAST_IPC_VERSION 3
+#define SWITCHCAST_VERSION_STRING "0.4.0"
+#define SWITCHCAST_IPC_VERSION 4
 #define SWITCHCAST_CRASH_MODULEID 0x6A
 #define SWITCHCAST_CONTENT_ID 0x00FF000053434153
 
@@ -23,17 +23,21 @@
 	MAKERESULT(SWITCHCAST_CRASH_MODULEID, 24)
 #define ERR_SWITCHCAST_VIDEO \
 	MAKERESULT(SWITCHCAST_CRASH_MODULEID, 25)
+#define ERR_SWITCHCAST_TRANSPORT \
+	MAKERESULT(SWITCHCAST_CRASH_MODULEID, 26)
 
 #define ERR_HIPC_UNKREQ MAKERESULT(11, 403)
 
-// Cast-only state values shared by the sysmodule and Settings UI.
+// Transport values shared by the sysmodule and Settings UI.
 #define TYPE_MODE_INVALID 0
 #define TYPE_MODE_CAST 1
-#define TYPE_MODE_NULL 2
+#define TYPE_MODE_USB_DOCK 2
+#define TYPE_MODE_NULL 3
 
 #define CMD_ENABLE 1
 #define CMD_DISABLE 2
 #define CMD_SET_BLANK_SCREEN 3
+#define CMD_SET_TRANSPORT 4
 #define CMD_GET_VER 100
 #define CMD_GET_ENABLED 101
 #define CMD_DEBUG_CRASH 102
@@ -41,6 +45,7 @@
 #define CMD_GET_CAST_TARGET_DELAY 105
 #define CMD_GET_CAST_RECEIVER_DELAY 106
 #define CMD_GET_BLANK_SCREEN 107
+#define CMD_GET_TRANSPORT 108
 
 // SwitchCast connection diagnostics exposed to the Settings application.
 #define CAST_STATUS_OFF 0
@@ -91,3 +96,13 @@
 #define CAST_STATUS_MIRROR_STARTUP_TIMEOUT CAST_STATUS_CODEC_TIMEOUT
 #define CAST_STATUS_MEDIA_ERROR_FLAG 0x80000000U
 #define CAST_STATUS_MEDIA_ERROR_CODE_MASK 0x7FFFFFFFU
+
+// USB Dock connection states occupy a separate range from Cast diagnostics.
+#define USB_STATUS_OFF 32
+#define USB_STATUS_INITIALIZING 33
+#define USB_STATUS_WAITING_DOCK 34
+#define USB_STATUS_WAITING_GAME 35
+#define USB_STATUS_STREAMING 36
+#define USB_STATUS_INIT_ERROR 37
+#define USB_STATUS_IO_ERROR 38
+#define USB_STATUS_CAPTURE_ERROR 39
