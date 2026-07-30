@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "../h264_low_delay.h"
+
 typedef struct {
 	uint8_t* data;
 	size_t capacity;
@@ -204,25 +206,13 @@ static bool SaveCastSps(
 	 * Match the complete known SPS so an unknown firmware encoder is never
 	 * rewritten speculatively. USB Dock mode does not use this module.
 	 */
-	static const uint8_t grcSps[] = {
-		0x67, 0x64, 0x0C, 0x20, 0xAC, 0x2B, 0x40, 0x28,
-		0x02, 0xDD, 0x35, 0x01, 0x0D, 0x01, 0xE0, 0x80,
-	};
-	static const uint8_t lowDelaySps[] = {
-		0x67, 0x64, 0x0C, 0x20, 0xAC, 0x2B, 0x40, 0x28,
-		0x02, 0xDD, 0x35, 0x01, 0x0D, 0x01, 0xE1, 0xB4,
-		0x11, 0x08, 0xD4,
-	};
-
-	if (
-		nal->size == sizeof(grcSps) &&
-		memcmp(nal->data, grcSps, sizeof(grcSps)) == 0) {
-		if (sizeof(lowDelaySps) > capacity)
-			return false;
-		memcpy(destination, lowDelaySps, sizeof(lowDelaySps));
-		*destinationSize = sizeof(lowDelaySps);
+	if (H264CopyKnownLowDelaySps(
+		destination,
+		capacity,
+		destinationSize,
+		nal->data,
+		nal->size))
 		return true;
-	}
 	return SaveParameterSet(
 		destination,
 		destinationSize,

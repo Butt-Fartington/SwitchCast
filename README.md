@@ -1,4 +1,4 @@
-# SwitchCast 0.4.3
+# SwitchCast 0.4.4
 
 ![SwitchCast controller-and-video mark](work/assets/switchcast-controller-mark.png)
 
@@ -37,6 +37,16 @@ This repository is maintained as a fork of SysDVR so GitHub also preserves
 the upstream commit history and displays the relationship on every repository
 page. The SwitchCast work is based on SysDVR snapshot
 [`804fd36`](https://github.com/exelix11/SysDVR/commit/804fd36e54983b7c76b249059b159f896af35b4d).
+
+## New in 0.4.4
+
+- Extended the validated low-delay SPS signaling to USB Dock mode.
+- Rewrites the exact initial GRC Annex-B SPS before USB transmission and emits
+  all periodically injected recovery SPS units with
+  `max_num_reorder_frames = 0` and `max_dec_frame_buffering = 1`.
+- Shared one exact-match SPS implementation between Cast and USB, with
+  dedicated raw-NAL, Annex-B expansion, capacity, fMP4, and protocol tests.
+- Unknown encoder configurations remain unchanged.
 
 ## New in 0.4.3
 
@@ -176,7 +186,7 @@ because an ordinary homebrew app cannot stay active beside a retail game.
 
 ## Install
 
-1. Extract `SwitchCast-Standalone-v0.4.3.zip` to the SD-card root.
+1. Extract `SwitchCast-Standalone-v0.4.4.zip` to the SD-card root.
 2. Reboot the console.
 3. Open `/switch/SwitchCast.nro` from the Homebrew Menu.
 4. Choose **Cast over Wi-Fi** and a receiver, or choose **USB Dock** and start
@@ -197,8 +207,8 @@ command. Contributions are welcome under the requirements in
 
 ### Upgrading
 
-Version 0.4.3 can be copied directly over 0.4.2, 0.4.1, 0.4.0, 0.3.2, 0.3.1,
-0.3.0, or
+Version 0.4.4 can be copied directly over 0.4.3, 0.4.2, 0.4.1, 0.4.0, 0.3.2,
+0.3.1, 0.3.0, or
 0.2.1. The
 sysmodule and Settings application must both come from the same release
 because the transport selector extends the SwitchCast IPC protocol.
@@ -206,10 +216,10 @@ because the transport selector extends the SwitchCast IPC protocol.
 ### Upgrading from the 0.1.0 prototype
 
 The prototype occupied the SysDVR content directory
-`/atmosphere/contents/00FF0000A53BB665`. Version 0.4.3 does not overwrite or
+`/atmosphere/contents/00FF0000A53BB665`. Version 0.4.4 does not overwrite or
 remove that directory.
 
-Before testing 0.4.3, make sure the old prototype or SysDVR is not also
+Before testing 0.4.4, make sure the old prototype or SysDVR is not also
 streaming or enabled at boot. Two capture sysmodules can compete for memory and
 the capture service. If `00FF0000A53BB665` contains the old SwitchCast
 prototype, restore your SysDVR backup or remove that old prototype directory.

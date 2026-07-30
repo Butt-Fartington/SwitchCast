@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.4 — 2026-07-30
+
+- Extended the explicit zero-reorder, one-frame DPB SPS signaling to USB Dock
+  mode.
+- Rewrote the initial exact known GRC SPS in Annex-B packets before USB
+  transmission.
+- Changed periodically injected recovery SPS units to carry the low-delay VUI
+  restrictions directly.
+- Shared the exact-match SPS logic with Cast mode and added raw SPS, Annex-B,
+  capacity, and fMP4 regression tests.
+- Left unrecognized encoder configurations unchanged.
+
 ## 0.4.3 — 2026-07-29
 
 - Added a Cast-only SPS substitution in the fMP4 `avcC` record.

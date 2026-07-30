@@ -13,6 +13,7 @@
 
 #include "../capture.h"
 #include "../cast/cast.h"
+#include "../h264_low_delay.h"
 #include "../modes/modes.h"
 #include "usb_proto.h"
 #include "usb_transport.h"
@@ -177,6 +178,15 @@ static void UsbVideoThread(void* unused)
 			!atomic_load(&UsbClientConnected) ||
 			generation != atomic_load(&UsbSessionGeneration))
 			continue;
+
+		if (captured) {
+			size_t videoSize = VPkt.Header.DataSize;
+			(void)H264RewriteAnnexBLowDelaySps(
+				VPkt.Data,
+				&videoSize,
+				VbufSz);
+			VPkt.Header.DataSize = (u32)videoSize;
+		}
 
 		const size_t packetSize =
 			sizeof(PacketHeader) + VPkt.Header.DataSize;

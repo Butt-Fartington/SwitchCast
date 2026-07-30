@@ -3,7 +3,7 @@
 Install devkitPro with devkitA64, libnx, and the Switch portlibs needed by the
 Settings app: curl, zlib, GLFW, EGL, and their graphics dependencies.
 
-The official 0.4.3 release uses:
+The official 0.4.4 release uses:
 
 ```text
 devkitA64 / GCC 16.1.0
@@ -51,10 +51,17 @@ cc -std=c11 -Wall -Wextra -Werror -O2 \
 ./build-host/test_cast_proto
 
 cc -std=c11 -Wall -Wextra -Werror -O2 \
+  sysmodule/source/h264_low_delay.c \
   sysmodule/source/cast/fmp4.c \
   tests/test_fmp4.c \
   -o build-host/test_fmp4
 ./build-host/test_fmp4
+
+cc -std=c11 -Wall -Wextra -Werror -O2 \
+  sysmodule/source/h264_low_delay.c \
+  tests/test_h264_low_delay.c \
+  -o build-host/test_h264_low_delay
+./build-host/test_h264_low_delay
 
 c++ -std=c++17 -Wall -Wextra -Werror -O2 \
   SwitchCastConfig/source/CastDiscovery.cpp \
@@ -80,4 +87,4 @@ switch/SwitchCast.nro
 
 `ReleaseSysmodule.sh` performs a clean two-binary build, runs the host checks,
 assembles the SD-card layout, includes all attribution and license documents,
-and writes `build-release/SwitchCast-Standalone-v0.4.3.zip`.
+and writes `build-release/SwitchCast-Standalone-v0.4.4.zip`.

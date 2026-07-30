@@ -2,7 +2,7 @@
 set -eu
 
 PROJECT_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-VERSION=0.4.3
+VERSION=0.4.4
 
 if [ -z "${DEVKITPRO:-}" ]; then
 	echo "Set DEVKITPRO to a complete devkitPro installation." >&2
@@ -36,10 +36,17 @@ cc -std=c11 -Wall -Wextra -Werror -O2 \
 "$HOST_BUILD/test_cast_proto"
 
 cc -std=c11 -Wall -Wextra -Werror -O2 \
+	"$PROJECT_ROOT/sysmodule/source/h264_low_delay.c" \
 	"$PROJECT_ROOT/sysmodule/source/cast/fmp4.c" \
 	"$PROJECT_ROOT/tests/test_fmp4.c" \
 	-o "$HOST_BUILD/test_fmp4"
 "$HOST_BUILD/test_fmp4"
+
+cc -std=c11 -Wall -Wextra -Werror -O2 \
+	"$PROJECT_ROOT/sysmodule/source/h264_low_delay.c" \
+	"$PROJECT_ROOT/tests/test_h264_low_delay.c" \
+	-o "$HOST_BUILD/test_h264_low_delay"
+"$HOST_BUILD/test_h264_low_delay"
 
 c++ -std=c++17 -Wall -Wextra -Werror -O2 \
 	"$PROJECT_ROOT/SwitchCastConfig/source/CastDiscovery.cpp" \
