@@ -2,7 +2,7 @@
 
 // SwitchCast owns its version, IPC protocol, Atmosphere content ID, and
 // configuration namespace. It does not register or depend on SysDVR.
-#define SWITCHCAST_VERSION_STRING "0.4.2"
+#define SWITCHCAST_VERSION_STRING "0.4.3"
 #define SWITCHCAST_IPC_VERSION 4
 #define SWITCHCAST_CRASH_MODULEID 0x6A
 #define SWITCHCAST_CONTENT_ID 0x00FF000053434153

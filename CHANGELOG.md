@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.3 — 2026-07-29
+
+- Added a Cast-only SPS substitution in the fMP4 `avcC` record.
+- Explicitly signaled zero reordered frames and a one-frame decoded picture
+  buffer for the known GRC 720p30 SPS.
+- Preserved the original High Profile Level 3.2 encoding parameters, color
+  description, one-reference-picture requirement, PPS, and captured slices.
+- Left unrecognized SPS variants and the entire USB Dock path unchanged.
+
 ## 0.4.2 — 2026-07-27
 
 - Replaced indefinite libnx USB writes with the SysDVR-derived

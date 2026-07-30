@@ -39,6 +39,56 @@ static bool ContainsBox(const uint8_t* data, size_t size, const char type[4])
 	return false;
 }
 
+static void TestCastLowDelaySps(void)
+{
+	static const uint8_t accessUnit[] = {
+		0, 0, 0, 1,
+		0x67, 0x64, 0x0C, 0x20, 0xAC, 0x2B, 0x40, 0x28,
+		0x02, 0xDD, 0x35, 0x01, 0x0D, 0x01, 0xE0, 0x80,
+		0, 0, 0, 1,
+		0x68, 0xEE, 0x3C, 0xB0,
+	};
+	static const uint8_t expectedSps[] = {
+		0x67, 0x64, 0x0C, 0x20, 0xAC, 0x2B, 0x40, 0x28,
+		0x02, 0xDD, 0x35, 0x01, 0x0D, 0x01, 0xE1, 0xB4,
+		0x11, 0x08, 0xD4,
+	};
+
+	Fmp4Stream stream;
+	Fmp4Init(&stream);
+	assert(Fmp4ObserveAccessUnit(
+		&stream,
+		accessUnit,
+		sizeof(accessUnit)));
+	assert(stream.spsSize == sizeof(expectedSps));
+	assert(memcmp(
+		stream.sps,
+		expectedSps,
+		sizeof(expectedSps)) == 0);
+	assert(stream.ppsSize == 4);
+
+	uint8_t init[2048];
+	const size_t initSize = Fmp4BuildInitSegment(
+		&stream,
+		init,
+		sizeof(init),
+		1280,
+		720);
+	assert(initSize != 0);
+
+	bool found = false;
+	for (size_t i = 0; i + sizeof(expectedSps) <= initSize; ++i) {
+		if (memcmp(
+				init + i,
+				expectedSps,
+				sizeof(expectedSps)) == 0) {
+			found = true;
+			break;
+		}
+	}
+	assert(found);
+}
+
 static void TestSynthetic(void)
 {
 	static const uint8_t accessUnit[] = {
@@ -192,6 +242,7 @@ static void ConvertAnnexBFile(
 
 int main(int argc, char** argv)
 {
+	TestCastLowDelaySps();
 	TestSynthetic();
 	if (argc == 3)
 		ConvertAnnexBFile(argv[1], argv[2]);

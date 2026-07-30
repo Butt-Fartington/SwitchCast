@@ -183,6 +183,53 @@ static bool SaveParameterSet(
 	return true;
 }
 
+static bool SaveCastSps(
+	uint8_t* destination,
+	size_t* destinationSize,
+	size_t capacity,
+	const AnnexBNal* nal)
+{
+	/*
+	 * GRC's fixed 720p30 SPS omits VUI bitstream restrictions. For High
+	 * Profile Level 3.2 that makes a decoder infer the level-sized DPB and
+	 * frame-reordering allowance, even though GRC emits no B-frames and uses
+	 * only one reference picture.
+	 *
+	 * The Cast fMP4 path carries SPS/PPS only in avcC, so substitute an
+	 * otherwise identical SPS with:
+	 *   max_num_reorder_frames = 0
+	 *   max_dec_frame_buffering = 1
+	 *
+	 * The value 1 is the legal minimum because max_num_ref_frames is 1.
+	 * Match the complete known SPS so an unknown firmware encoder is never
+	 * rewritten speculatively. USB Dock mode does not use this module.
+	 */
+	static const uint8_t grcSps[] = {
+		0x67, 0x64, 0x0C, 0x20, 0xAC, 0x2B, 0x40, 0x28,
+		0x02, 0xDD, 0x35, 0x01, 0x0D, 0x01, 0xE0, 0x80,
+	};
+	static const uint8_t lowDelaySps[] = {
+		0x67, 0x64, 0x0C, 0x20, 0xAC, 0x2B, 0x40, 0x28,
+		0x02, 0xDD, 0x35, 0x01, 0x0D, 0x01, 0xE1, 0xB4,
+		0x11, 0x08, 0xD4,
+	};
+
+	if (
+		nal->size == sizeof(grcSps) &&
+		memcmp(nal->data, grcSps, sizeof(grcSps)) == 0) {
+		if (sizeof(lowDelaySps) > capacity)
+			return false;
+		memcpy(destination, lowDelaySps, sizeof(lowDelaySps));
+		*destinationSize = sizeof(lowDelaySps);
+		return true;
+	}
+	return SaveParameterSet(
+		destination,
+		destinationSize,
+		capacity,
+		nal);
+}
+
 void Fmp4Init(Fmp4Stream* stream)
 {
 	memset(stream, 0, sizeof(*stream));
@@ -201,7 +248,7 @@ bool Fmp4ObserveAccessUnit(
 	AnnexBNal nal;
 	while (NextNal(annexB, annexBSize, &cursor, &nal)) {
 		if (nal.type == 7)
-			SaveParameterSet(
+			SaveCastSps(
 				stream->sps,
 				&stream->spsSize,
 				sizeof(stream->sps),

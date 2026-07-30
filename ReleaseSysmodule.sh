@@ -2,7 +2,7 @@
 set -eu
 
 PROJECT_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-VERSION=0.4.2
+VERSION=0.4.3
 
 if [ -z "${DEVKITPRO:-}" ]; then
 	echo "Set DEVKITPRO to a complete devkitPro installation." >&2
